@@ -18,6 +18,7 @@
   --speed:#3B4BB0; --speed-ink:#FFFFFF;
   --other:#3A4744; --other-ink:#FFFFFF;
   --danger:#B3261E; --ok:#2E7D4F;
+  --stage:#D9DFDD;
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark){
@@ -29,6 +30,7 @@
     --speed:#8392F7; --speed-ink:#0A0E26;
     --other:#C3CFCC; --other-ink:#0C1211;
     --danger:#FF7B72; --ok:#5CC48A;
+    --stage:#050908;
     color-scheme: dark;
   }
 }
@@ -145,6 +147,15 @@ label > input, label > select, label > textarea{margin-top:4px;color:var(--ink)}
 .obslist{list-style:none;margin:0;padding:0}
 .obslist li{padding:10px 0;border-bottom:1px solid var(--line);font-size:15px}
 
+/* ===== 館内図（記録画面） ===== */
+.mappanel{flex:none;height:32vh;position:relative;background:var(--stage);border-bottom:1px solid var(--line)}
+.mappanel svg{width:100%;height:100%;display:block}
+.mappanel .maphint{position:absolute;left:8px;bottom:6px;font-size:12px;background:var(--surface);color:var(--muted);border-radius:8px;padding:1px 8px}
+.mz{fill:var(--muted);fill-opacity:.08;stroke:var(--muted);stroke-width:1.5;vector-effect:non-scaling-stroke}
+.mz.cur{fill:var(--dwell);fill-opacity:.22;stroke:var(--dwell);stroke-width:3.5}
+.ml{stroke:var(--speed);stroke-width:4;vector-effect:non-scaling-stroke}
+.mlbl{fill:var(--ink);stroke:var(--surface);paint-order:stroke;font-weight:700}
+#map-btn.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
 #toast{position:fixed;left:12px;right:12px;max-width:616px;margin:0 auto;z-index:30;
   background:var(--ink);color:var(--bg);border-radius:14px;padding:10px 12px 10px 16px;
   display:flex;align-items:center;gap:12px;font-size:16px}
@@ -202,11 +213,16 @@ label > input, label > select, label > textarea{margin-top:4px;color:var(--ink)}
       <div id="rh-zone" class="zone"></div>
       <div id="rh-meta" class="small muted"></div>
     </div>
+    <button id="map-btn" class="ghost" hidden>地図</button>
     <button id="end-btn" class="ghost">終える</button>
   </header>
   <div class="lastbar">
     <div id="last-desc"></div>
     <button id="undo-btn" class="undo" disabled>取り消す</button>
+  </div>
+  <div id="map-panel" class="mappanel" hidden>
+    <svg id="map-svg" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet"></svg>
+    <div class="maphint" id="map-hint"></div>
   </div>
   <div id="sync-banner" class="banner" hidden>
     <div>CoreS3の時刻合わせの目印と、同時に押してください。</div>
@@ -342,7 +358,7 @@ const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
 
 let plan = null, obs = null, tab = 'dwell', pair = null, groupTarget = null;
-let audioCtx = null, wakeLock = null, desire = null, saveOk = true;
+let wakeLock = null, desire = null, saveOk = true;
 
 const REL = {solo:'一人', couple:'恋人', friends:'友人', family:'家族', tour:'団体', unknown:'不明'};
 const MEM = {child:'子ども', elder:'高齢者'};
@@ -377,6 +393,29 @@ function listObs(){
     if(k && k.startsWith(K_OBS)){ const o = readJSON(k); if(o) out.push(o); }
   }
   return out.sort((a, b) => a.started_ms - b.started_ms);
+}
+
+/* ---------- 館内図の画像の保存（IndexedDB） ----------
+   画像は数百KB〜数MBあり、記録と同じ入れ物（localStorage、約5MB）に入れると記録の容量を圧迫する。
+   そこで画像だけ、容量の大きい別の入れ物（IndexedDB）に、計画のIDを名前にして保存する。
+   計画づくりのページ（keikaku.html）も同じ入れ物を使う */
+let dbP = null;
+function idb(){
+  if(!dbP) dbP = new Promise((res, rej) => {
+    const r = indexedDB.open('vobs', 1);
+    r.onupgradeneeded = () => { const db = r.result; for(const s of ['maps','kv']) if(!db.objectStoreNames.contains(s)) db.createObjectStore(s); };
+    r.onsuccess = () => res(r.result);
+    r.onerror = () => rej(r.error);
+  });
+  return dbP;
+}
+async function idbGet(store, key){
+  const db = await idb();
+  return new Promise((res, rej) => { const q = db.transaction(store).objectStore(store).get(key); q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error); });
+}
+async function idbPut(store, key, val){
+  const db = await idb();
+  return new Promise((res, rej) => { const tx = db.transaction(store, 'readwrite'); tx.objectStore(store).put(val, key); tx.oncomplete = () => res(true); tx.onerror = () => rej(tx.error); });
 }
 
 /* ---------- 記録の追加（すべての記録はここを通る） ---------- */
@@ -706,36 +745,76 @@ function tick(){
   while(obs.next_count_ms <= now) obs.next_count_ms += iv; // 画面が消えていて逃した回はまとめて1回にする
   addEvent('count_prompt', {auto:true});
   openCount(true);
-  beep();
 }
 setInterval(tick, 1000);
 
-/* ---------- 音と画面の点灯 ---------- */
-function initAudio(){
-  try{
-    if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    if(audioCtx.state === 'suspended') audioCtx.resume();
-  }catch(e){}
-}
-document.addEventListener('pointerdown', initAudio, {once:true});
-function beep(){
-  try{
-    if(!audioCtx) return;
-    const t0 = audioCtx.currentTime, o = audioCtx.createOscillator(), g = audioCtx.createGain();
-    o.frequency.value = 880;
-    g.gain.setValueAtTime(0.0001, t0);
-    g.gain.exponentialRampToValueAtTime(0.25, t0 + 0.02);
-    g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.5);
-    o.connect(g).connect(audioCtx.destination);
-    o.start(t0); o.stop(t0 + 0.55);
-  }catch(e){}
-}
+/* ---------- 画面の点灯 ----------
+   数え上げの知らせは音を出さず、画面にシートを出すだけにする（館内で音を鳴らさないため） */
 async function keepAwake(){
   try{ if('wakeLock' in navigator && document.visibilityState === 'visible') wakeLock = await navigator.wakeLock.request('screen'); }catch(e){}
 }
 document.addEventListener('visibilitychange', () => {
   if(document.visibilityState === 'visible' && obs && !obs.ended_ms){ keepAwake(); tick(); render(); }
 });
+
+/* ---------- 館内図（記録画面） ----------
+   観察を始めたときに、計画の区画と線の形を観察の中にコピーしておく（obs.geo）。
+   あとで計画を外したり差し替えたりしても、その観察の地図は変わらない */
+function planGeo(){
+  if(!plan || !plan.map || !plan.map.width_px) return null;
+  return {plan_id: plan.plan_id || 'unnamed-plan', w: plan.map.width_px, h: plan.map.height_px,
+          zones: plan.zones, speed_lines: plan.speed_lines || []};
+}
+let mapURL = null, mapWhole = false;
+async function setupMap(){
+  mapURL = null; mapWhole = false;
+  $('#map-btn').hidden = true; $('#map-panel').hidden = true;
+  if(!obs || !obs.geo) return;
+  try{ mapURL = await idbGet('maps', obs.geo.plan_id); }catch(e){ mapURL = null; }
+  if(!mapURL) return;
+  $('#map-btn').hidden = false;
+  showMap(localStorage.getItem('vobs:showMap') !== '0');
+}
+function showMap(on){
+  $('#map-panel').hidden = !on;
+  $('#map-btn').classList.toggle('on', on);
+  localStorage.setItem('vobs:showMap', on ? '1' : '0');
+  if(on) drawMap();
+}
+function drawMap(){
+  if(!obs || !obs.geo || !mapURL || $('#map-panel').hidden) return;
+  const g = obs.geo, W = g.w, H = g.h, P = p => [p[0] * W, p[1] * H];
+  const z = g.zones.find(z => z.zone_id === obs.zone_id);
+  const pairs = g.speed_lines.filter(l => l.zone_id === obs.zone_id);
+  let box = [0, 0, W, H];
+  if(!mapWhole && z){ // 区画と、その区画の線が収まる範囲に、少し余白を足して映す
+    const q = [...z.polygon, ...pairs.flatMap(l => [...l.line1, ...l.line2])].map(P);
+    const x0 = Math.min(...q.map(a => a[0])), x1 = Math.max(...q.map(a => a[0]));
+    const y0 = Math.min(...q.map(a => a[1])), y1 = Math.max(...q.map(a => a[1]));
+    const m = Math.max(x1 - x0, y1 - y0) * 0.3 + Math.max(W, H) * 0.01;
+    box = [x0 - m, y0 - m, x1 - x0 + m * 2, y1 - y0 + m * 2];
+  }
+  const svgEl = $('#map-svg'), r = svgEl.getBoundingClientRect();
+  const k = Math.min(r.width / box[2], r.height / box[3]) || 1; // 画像1ピクセルが画面の何ピクセルか
+  const fs = 14 / k, halo = 4 / k;
+  const pts = a => a.map(p => P(p).join(',')).join(' ');
+  let s = `<image href="${mapURL}" x="0" y="0" width="${W}" height="${H}"/>`;
+  for(const zz of g.zones) s += `<polygon class="mz${zz.zone_id === obs.zone_id ? ' cur' : ''}" points="${pts(zz.polygon)}"/>`;
+  for(const l of pairs){
+    for(const [mark, ln] of [['①', l.line1], ['②', l.line2]]){
+      const [a, b] = [P(ln[0]), P(ln[1])];
+      s += `<line class="ml" x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}"/>`;
+      s += `<text class="mlbl" x="${(a[0] + b[0]) / 2}" y="${(a[1] + b[1]) / 2 - fs * 0.9}" font-size="${fs}" stroke-width="${halo}" text-anchor="middle">${esc(l.line_pair_id)} ${mark}</text>`;
+    }
+  }
+  svgEl.setAttribute('viewBox', box.join(' '));
+  svgEl.innerHTML = s;
+  $('#map-hint').textContent = !z ? 'この区画は館内図に描かれていません'
+    : mapWhole ? 'タップで区画の周りを表示' : 'タップで館内図の全体を表示';
+}
+$('#map-btn').addEventListener('click', () => showMap($('#map-panel').hidden));
+$('#map-panel').addEventListener('click', () => { mapWhole = !mapWhole; drawMap(); });
+window.addEventListener('resize', drawMap);
 
 /* ---------- 観察の開始 ---------- */
 function startObs(){
@@ -760,6 +839,7 @@ function startObs(){
     plan_id: plan ? (plan.plan_id || 'unnamed-plan') : 'manual',
     facility, zone_id, zone_label,
     line_pairs: lines.length ? lines : ['L01'],
+    geo: planGeo(),
     count_interval_min: iv,
     started_ms: t, ended_ms: null, closed: false,
     next_count_ms: t + iv * 60000,
@@ -770,9 +850,9 @@ function startObs(){
   localStorage.setItem(K_CUR, obs.observation_id);
   if(!plan){ localStorage.setItem('vobs:lastFacility', facility); }
   pair = obs.line_pairs[0];
-  initAudio(); keepAwake();
+  keepAwake();
   if(navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
-  show('rec'); setTab('dwell'); render();
+  show('rec'); setTab('dwell'); render(); setupMap();
 }
 $('#start-btn').addEventListener('click', startObs);
 
@@ -834,7 +914,11 @@ $('#plan-file').addEventListener('change', async ev => {
   try{
     const p = JSON.parse(await f.text());
     if(!Array.isArray(p.zones) || !p.zones.length) throw new Error('zones');
-    if(p.map) delete p.map.image; // 館内図の画像は記録画面では使わないので、端末の保存容量を空けておく
+    if(p.map && p.map.image){
+      try{ await idbPut('maps', p.plan_id || 'unnamed-plan', p.map.image); }
+      catch(e){ toast('館内図を端末に保存できませんでした。区画と線は使えます'); }
+    }
+    if(p.map) delete p.map.image; // 画像は IndexedDB に入れたので、localStorage には軽い情報だけを残す
     plan = p;
     if(!writeJSON(K_PLAN, p)) toast('計画を端末に保存できませんでした');
     renderHome();
@@ -882,7 +966,7 @@ $('#export-share').addEventListener('click', async () => {
 /* ---------- 開始画面 ---------- */
 function renderHome(){
   $('#plan-status').textContent = plan
-    ? `計画「${plan.plan_id || '名前なし'}」（${(plan.facility && plan.facility.name) || '施設名なし'}、区画 ${plan.zones.length}個）を使います。`
+    ? `計画「${plan.plan_id || '名前なし'}」（${(plan.facility && plan.facility.name) || '施設名なし'}、区画 ${plan.zones.length}個${plan.map && plan.map.width_px ? '、館内図つき' : ''}）を使います。`
     : '計画を読み込まずに、施設と区画を手で入れて始めることもできます。';
   $('#plan-clear').hidden = !plan;
   $('#plan-fields').hidden = !plan;
@@ -955,6 +1039,9 @@ function toast(msg, actLabel, act){
   toastTimer = setTimeout(() => { t.hidden = true; }, actLabel ? 4000 : 2400);
 }
 
+// 電波がなくても開き直せるように、ページの控えを端末に作る（sw.js）
+if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+
 /* ---------- 起動：途中の観察があれば、そこから再開する ---------- */
 (function init(){
   plan = readJSON(K_PLAN);
@@ -963,7 +1050,7 @@ function toast(msg, actLabel, act){
   if(o && !o.closed){
     obs = o; pair = o.line_pairs[0];
     if(o.ended_ms){ openEnd(); }
-    else{ show('rec'); setTab('dwell'); render(); keepAwake(); tick(); }
+    else{ show('rec'); setTab('dwell'); render(); keepAwake(); tick(); setupMap(); }
     toast('前回の観察の続きから再開しました');
     return;
   }
