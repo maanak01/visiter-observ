@@ -889,6 +889,9 @@ $('#desire').addEventListener('click', ev => {
   $$('#desire button').forEach(x => x.classList.toggle('sel', x === b));
 });
 $('#finish-btn').addEventListener('click', () => {
+  // 終了の時刻合わせを押し忘れたまま終えないように、一度だけ確かめる
+  const synced = obs.events.some(e => !e.voided && e.event_type === 'sync_mark' && e.value_text === 'end');
+  if(!synced && !confirm('終了の時刻合わせをまだ押していません。押さずに終えますか。\n\n押さないと、CoreS3との時刻のずれは、開始時の1点だけで補正することになります。')) return;
   const est = $('#self-est').value.trim(), com = $('#self-comment').value.trim();
   if(est !== ''){
     const n = Number(est);
