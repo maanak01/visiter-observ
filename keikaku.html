@@ -1,0 +1,745 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="観察計画">
+<meta name="color-scheme" content="light dark">
+<title>観察計画をつくる</title>
+<style>
+/* 色は記録のアプリと同じ意味で使う：緑＝区画（滞在）、青＝歩く速さの線、黄＝縮尺 */
+:root{
+  --bg:#EEF1F0; --surface:#FFFFFF; --ink:#14201D; --muted:#5B6966; --line:#C9D2CF;
+  --stage:#D9DFDD;
+  --dwell:#0E6B5F; --dwell-ink:#FFFFFF;
+  --speed:#3B4BB0; --speed-ink:#FFFFFF;
+  --stop:#C98A0A;
+  --danger:#B3261E;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#0C1211; --surface:#161E1D; --ink:#E5ECEA; --muted:#93A29E; --line:#2B3735;
+    --stage:#050908;
+    --dwell:#2FA896; --dwell-ink:#04120F;
+    --speed:#8392F7; --speed-ink:#0A0E26;
+    --stop:#F0B43A;
+    --danger:#FF7B72;
+    color-scheme: dark;
+  }
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%;margin:0}
+body{
+  background:var(--bg);color:var(--ink);
+  font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;
+  font-size:16px;line-height:1.5;font-variant-numeric:tabular-nums;
+  -webkit-text-size-adjust:100%;-webkit-tap-highlight-color:transparent;overflow:hidden;
+}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;touch-action:manipulation}
+button:disabled{opacity:.35;cursor:default}
+input,select{font:inherit;font-size:16px;color:var(--ink);background:var(--surface);border:1.5px solid var(--line);border-radius:8px;padding:7px 10px;width:100%}
+:focus-visible{outline:3px solid var(--speed);outline-offset:2px}
+
+#app{display:flex;flex-direction:column;height:100%;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)}
+.top{display:flex;align-items:center;gap:6px;padding:8px 10px;background:var(--surface);border-bottom:1px solid var(--line);overflow-x:auto}
+.top h1{font-size:17px;margin:0 8px 0 4px;white-space:nowrap}
+.mode{white-space:nowrap;border:1.5px solid var(--line);border-radius:10px;padding:6px 12px;min-height:42px;font-weight:600}
+.mode.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.hint{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 12px;border-bottom:1px solid var(--line);font-size:15px;min-height:54px}
+.hint span{flex:1;min-width:14em}
+.hint button{border:1.5px solid var(--line);border-radius:10px;padding:4px 14px;min-height:40px;font-weight:600}
+
+.work{flex:1;display:flex;min-height:0}
+#stage{flex:1;position:relative;min-width:0;min-height:0;background:var(--stage);touch-action:none;overflow:hidden;-webkit-user-select:none;user-select:none}
+#svg{position:absolute;inset:0;width:100%;height:100%;display:block}
+.zoom{position:absolute;right:10px;bottom:10px;display:flex;flex-direction:column;gap:6px}
+.zoom button{width:46px;height:46px;border-radius:12px;background:var(--surface);border:1px solid var(--line);font-size:20px;font-weight:700}
+.zoom button.txt{font-size:13px}
+.empty{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;text-align:center;padding:24px;color:var(--muted)}
+.panel{width:390px;flex:none;overflow-y:auto;background:var(--surface);border-left:1px solid var(--line);padding:4px 16px 48px;-webkit-overflow-scrolling:touch}
+@media (max-width:820px){
+  .work{flex-direction:column}
+  #stage{flex:none;height:50vh}
+  .panel{width:auto;flex:1;border-left:0;border-top:1px solid var(--line)}
+}
+.panel h2{font-size:15px;color:var(--muted);margin:22px 0 6px;font-weight:700}
+.field{display:block;margin:8px 0;font-size:14px;color:var(--muted)}
+.field input,.field select{margin-top:3px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.item{border:1.5px solid var(--line);border-radius:12px;padding:8px 12px 4px;margin:8px 0}
+.item.sel{border-color:var(--ink);border-width:2.5px}
+.item-head{display:flex;align-items:center;gap:8px}
+.item-head .tag{font-weight:700;font-size:17px}
+.item-head .tag.z{color:var(--dwell)}
+.item-head .tag.l{color:var(--speed)}
+.item-head .tag.s{color:var(--stop)}
+.item-head .sp{flex:1}
+.item-head button{font-size:14px;border:1px solid var(--line);border-radius:8px;padding:2px 10px;min-height:34px}
+.del{color:var(--danger)}
+.note{font-size:13px;color:var(--muted);margin:4px 0 8px}
+.btn{display:inline-flex;align-items:center;justify-content:center;border-radius:10px;padding:8px 14px;min-height:44px;font-weight:700;border:1.5px solid var(--line);margin:4px 6px 0 0;cursor:pointer;color:var(--ink);font-size:15px}
+.btn.primary{background:var(--dwell);color:var(--dwell-ink);border-color:var(--dwell)}
+.btn.del{color:var(--danger)}
+.suggest{border:1.5px dashed var(--speed);color:var(--speed);border-radius:8px;padding:2px 10px;min-height:34px;font-size:14px;margin:0 0 6px}
+
+/* 地図の上の図形。線の太さは拡大しても変わらないようにする */
+.zone{fill:var(--dwell);fill-opacity:.16;stroke:var(--dwell);stroke-width:2;vector-effect:non-scaling-stroke}
+.zone.sel{fill-opacity:.34;stroke-width:4}
+.sl{stroke:var(--speed);stroke-width:3;vector-effect:non-scaling-stroke}
+.sl.sel{stroke-width:6}
+.sc{stroke:var(--stop);stroke-width:3;stroke-dasharray:9 6;vector-effect:non-scaling-stroke}
+.sc.sel{stroke-width:6}
+.hit{stroke:transparent;stroke-width:24;vector-effect:non-scaling-stroke}
+.tmp{fill:var(--danger);fill-opacity:.08;stroke:var(--danger);stroke-width:2;stroke-dasharray:6 4;vector-effect:non-scaling-stroke}
+.tmpl{fill:none;stroke:var(--danger);stroke-width:2;stroke-dasharray:6 4;vector-effect:non-scaling-stroke}
+.dot{fill:var(--surface);stroke:var(--danger);stroke-width:2;vector-effect:non-scaling-stroke}
+.end{fill:var(--surface);stroke:var(--speed);stroke-width:2;vector-effect:non-scaling-stroke}
+.lbl{fill:var(--ink);stroke:var(--surface);paint-order:stroke;font-weight:700;pointer-events:none}
+
+#toast{position:fixed;left:12px;right:12px;bottom:calc(env(safe-area-inset-bottom) + 16px);max-width:560px;margin:0 auto;z-index:30;
+  background:var(--ink);color:var(--bg);border-radius:14px;padding:12px 16px;font-size:15px}
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="top">
+    <h1>観察計画</h1>
+    <button class="mode on" data-mode="view">見る・選ぶ</button>
+    <button class="mode" data-mode="rect">四角の区画</button>
+    <button class="mode" data-mode="poly">多角形の区画</button>
+    <button class="mode" data-mode="line">線の組</button>
+    <button class="mode" data-mode="scale">縮尺</button>
+  </div>
+  <div class="hint">
+    <span id="hint-text"></span>
+    <button id="h-back" hidden>1点戻す</button>
+    <button id="h-close" hidden>閉じて完成</button>
+    <button id="h-cancel" hidden>やめる</button>
+  </div>
+  <div class="work">
+    <div id="stage">
+      <svg id="svg" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" preserveAspectRatio="xMidYMid meet">
+        <image id="mapimg" x="0" y="0" width="0" height="0"/>
+        <g id="scene"></g>
+      </svg>
+      <div id="empty" class="empty">
+        <div>館内図の画像を読み込むと、ここに表示されます。</div>
+        <label class="btn primary">館内図の画像を選ぶ<input type="file" accept="image/*" data-img hidden></label>
+      </div>
+      <div class="zoom">
+        <button id="z-in" aria-label="拡大">＋</button>
+        <button id="z-out" aria-label="縮小">−</button>
+        <button id="z-fit" class="txt">全体</button>
+      </div>
+    </div>
+    <div class="panel" id="panel"></div>
+  </div>
+</div>
+<div id="toast" hidden></div>
+
+<script>
+'use strict';
+/* =========================================================
+   座標のしくみ
+   - 図形の点は、画像の幅・高さに対する割合（0〜1）で持つ
+   - 表示するときだけ、画像のピクセルに直す（割合 × 幅、割合 × 高さ）
+   - 拡大・移動は、SVGの viewBox（画面に映す範囲）を動かして行う
+   ========================================================= */
+const $ = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+const stage = $('#stage'), svg = $('#svg'), scene = $('#scene'), panel = $('#panel');
+const KINDS = [['museum','博物館'],['art_museum','美術館'],['zoo','動物園'],['aquarium','水族館'],['theme_park','テーマパーク'],['other','その他']];
+
+let P = null;                 // 作業中の計画
+let mode = 'view';
+let temp = {pts:[], line1:null, rect:null}; // 描いている途中の図形
+let sel = null;               // 選んでいる図形 {kind, id}
+let vb = {x:0, y:0, w:0, h:0};// 画面に映している範囲（画像のピクセル単位）
+let saveText = '';
+
+/* ---------- 端末の保存（IndexedDB）。記録のアプリと同じ入れ物を使う ---------- */
+let dbP = null;
+function idb(){
+  if(!dbP) dbP = new Promise((res, rej) => {
+    const r = indexedDB.open('vobs', 1);
+    r.onupgradeneeded = () => { const db = r.result; for(const s of ['maps','kv']) if(!db.objectStoreNames.contains(s)) db.createObjectStore(s); };
+    r.onsuccess = () => res(r.result);
+    r.onerror = () => rej(r.error);
+  });
+  return dbP;
+}
+async function idbGet(store, key){
+  const db = await idb();
+  return new Promise((res, rej) => { const q = db.transaction(store).objectStore(store).get(key); q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error); });
+}
+async function idbPut(store, key, val){
+  const db = await idb();
+  return new Promise((res, rej) => { const tx = db.transaction(store, 'readwrite'); tx.objectStore(store).put(val, key); tx.oncomplete = () => res(true); tx.onerror = () => rej(tx.error); });
+}
+let saveTimer = null;
+function scheduleSave(){
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(async () => {
+    try{ await idbPut('kv', 'draft', P); saveText = 'このブラウザに自動で保存しました。'; }
+    catch(e){ saveText = '保存できませんでした。JSONを書き出してください。'; }
+    const el = $('#save-state'); if(el) el.textContent = saveText;
+  }, 400);
+}
+
+/* ---------- 計画のひな形 ---------- */
+function pad(n){ return String(n).padStart(2, '0'); }
+function today(){ const d = new Date(); return `${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}`; }
+function newPlan(){
+  return {
+    schema:'visitor-obs-plan', schema_version:1,
+    plan_id:'plan_' + today(),
+    facility:{name:'', kind:'museum'},
+    map:{image:null, width_px:0, height_px:0, scale:null},
+    zones:[], speed_lines:[],
+    settings:{count_interval_min:5}
+  };
+}
+function normalize(p){
+  const n = newPlan();
+  n.plan_id = p.plan_id || n.plan_id;
+  n.facility = Object.assign(n.facility, p.facility || {});
+  n.map = Object.assign(n.map, p.map || {});
+  n.zones = Array.isArray(p.zones) ? p.zones : [];
+  n.speed_lines = Array.isArray(p.speed_lines) ? p.speed_lines : [];
+  n.settings = Object.assign(n.settings, p.settings || {});
+  return n;
+}
+
+/* ---------- 計算 ---------- */
+const W = () => P.map.width_px, H = () => P.map.height_px;
+const px = p => [p[0] * W(), p[1] * H()];
+const r5 = v => Math.round(v * 1e5) / 1e5;
+function distPx(a, b){ const [ax, ay] = px(a), [bx, by] = px(b); return Math.hypot(bx - ax, by - ay); }
+function metersPerPx(){ const s = P.map.scale; return s && s.meters > 0 ? s.meters / distPx(s.a, s.b) : null; }
+// 1本目の線（両側に伸ばした直線）から、2本目の線の真ん中までのまっすぐな距離（ピクセル）
+function pairGapPx(l){
+  const [ax, ay] = px(l.line1[0]), [bx, by] = px(l.line1[1]);
+  const m = [(l.line2[0][0] + l.line2[1][0]) / 2, (l.line2[0][1] + l.line2[1][1]) / 2];
+  const [mx, my] = px(m);
+  const len = Math.hypot(bx - ax, by - ay) || 1;
+  return Math.abs((bx - ax) * (ay - my) - (ax - mx) * (by - ay)) / len;
+}
+function inPoly(p, poly){ // 点が多角形の中にあるか（横に線を引いて、境目を何回またぐかで判定）
+  let inside = false;
+  for(let i = 0, j = poly.length - 1; i < poly.length; j = i++){
+    const [xi, yi] = poly[i], [xj, yj] = poly[j];
+    if(((yi > p[1]) !== (yj > p[1])) && p[0] < (xj - xi) * (p[1] - yi) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
+function center(pts){ return [pts.reduce((s, p) => s + p[0], 0) / pts.length, pts.reduce((s, p) => s + p[1], 0) / pts.length]; }
+function nextId(prefix, ids){ let n = 1; while(ids.includes(prefix + pad(n))) n++; return prefix + pad(n); }
+function esc(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function numOrNull(v){ const n = parseFloat(v); return Number.isFinite(n) ? n : null; }
+
+/* ---------- 画面と画像の座標の変換 ---------- */
+function rect(){ return stage.getBoundingClientRect(); }
+function toNorm(cx, cy){
+  const r = rect();
+  const x = vb.x + (cx - r.left) / r.width * vb.w, y = vb.y + (cy - r.top) / r.height * vb.h;
+  return [r5(Math.min(1, Math.max(0, x / W()))), r5(Math.min(1, Math.max(0, y / H())))];
+}
+function toScreen(p){
+  const r = rect(), [x, y] = px(p);
+  return [r.left + (x - vb.x) / vb.w * r.width, r.top + (y - vb.y) / vb.h * r.height];
+}
+function applyVB(){
+  svg.setAttribute('viewBox', `${vb.x} ${vb.y} ${vb.w} ${vb.h}`);
+  render();
+}
+function fitBox(x0, y0, x1, y1, padFrac = 0.08){
+  const r = rect(); if(!r.width || !r.height) return;
+  const bw = Math.max(x1 - x0, 1), bh = Math.max(y1 - y0, 1);
+  const padv = Math.max(bw, bh) * padFrac;
+  let w = bw + padv * 2, h = bh + padv * 2;
+  const aspect = r.height / r.width;           // 画面の縦横比に合わせて、映す範囲を広げる
+  if(h / w > aspect) w = h / aspect; else h = w * aspect;
+  vb = {x:(x0 + x1) / 2 - w / 2, y:(y0 + y1) / 2 - h / 2, w, h};
+  applyVB();
+}
+function fitAll(){ if(P.map.image) fitBox(0, 0, W(), H(), 0.02); }
+function fitPoints(pts){
+  const q = pts.map(px);
+  fitBox(Math.min(...q.map(a => a[0])), Math.min(...q.map(a => a[1])), Math.max(...q.map(a => a[0])), Math.max(...q.map(a => a[1])), 0.4);
+}
+function zoomAt(cx, cy, k){
+  const r = rect(), maxS = Math.max(W(), H());
+  const w = Math.min(maxS * 4, Math.max(maxS * 0.02, vb.w * k)), h = w * r.height / r.width;
+  const sx = vb.x + (cx - r.left) / r.width * vb.w, sy = vb.y + (cy - r.top) / r.height * vb.h;
+  vb = {x: sx - (cx - r.left) / r.width * w, y: sy - (cy - r.top) / r.height * h, w, h};
+  applyVB();
+}
+new ResizeObserver(() => {
+  if(!P || !P.map.image) return;
+  const r = rect(); if(!r.width) return;
+  if(!vb.w){ fitAll(); return; }
+  const cx = vb.x + vb.w / 2, cy = vb.y + vb.h / 2;
+  vb.h = vb.w * r.height / r.width; vb.x = cx - vb.w / 2; vb.y = cy - vb.h / 2;
+  applyVB();
+}).observe(stage);
+
+/* ---------- 地図の上を描く ---------- */
+function isSel(kind, id){ return sel && sel.kind === kind && (id === undefined || sel.id === id); }
+function render(){
+  if(!P) return;
+  $('#empty').hidden = !!P.map.image;
+  if(!P.map.image || !vb.w){ scene.innerHTML = ''; return; }
+  const u = vb.w / rect().width;  // 画面の1ピクセルが、画像の何ピクセルにあたるか
+  const fs = 14 * u, halo = 4 * u, rr = 6 * u;
+  const pts = a => a.map(p => px(p).join(',')).join(' ');
+  const lbl = (p, t, size = fs) => { const [x, y] = px(p); return `<text class="lbl" x="${x}" y="${y}" font-size="${size}" stroke-width="${halo}" text-anchor="middle" dominant-baseline="middle">${esc(t)}</text>`; };
+  const seg = (a, b, cls, data) => { const [x1, y1] = px(a), [x2, y2] = px(b); return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" class="${cls}"${data || ''}/>`; };
+  let s = '';
+  for(const z of P.zones){
+    s += `<polygon class="zone${isSel('zone', z.zone_id) ? ' sel' : ''}" points="${pts(z.polygon)}" data-sel="zone" data-id="${esc(z.zone_id)}"/>`;
+  }
+  for(const z of P.zones) s += lbl(center(z.polygon), z.name ? `${z.zone_id} ${z.name}` : z.zone_id);
+  for(const l of P.speed_lines){
+    const on = isSel('pair', l.line_pair_id) ? ' sel' : '';
+    const d = ` data-sel="pair" data-id="${esc(l.line_pair_id)}"`;
+    for(const [k, ln] of [['①', l.line1], ['②', l.line2]]){
+      s += seg(ln[0], ln[1], 'hit', d) + seg(ln[0], ln[1], 'sl' + on, d);
+      const m = center(ln); const [mx, my] = px(m);
+      s += `<text class="lbl" x="${mx}" y="${my - fs * 1.1}" font-size="${fs}" stroke-width="${halo}" text-anchor="middle">${esc(l.line_pair_id)} ${k}</text>`;
+    }
+  }
+  const sc = P.map.scale;
+  if(sc){
+    const d = ' data-sel="scale" data-id="scale"';
+    s += seg(sc.a, sc.b, 'hit', d) + seg(sc.a, sc.b, 'sc' + (isSel('scale') ? ' sel' : ''), d);
+    s += lbl(center([sc.a, sc.b]), sc.meters > 0 ? `${sc.meters} m` : '距離を入力');
+  }
+  // 描いている途中の図形
+  if(temp.rect) s += `<polygon class="tmp" points="${pts(rectPoly(temp.rect[0], temp.rect[1]))}"/>`;
+  if(temp.line1) s += seg(temp.line1[0], temp.line1[1], 'sl');
+  if(temp.pts.length){
+    if(mode === 'poly' && temp.pts.length > 1) s += `<polyline class="tmpl" points="${pts(temp.pts)}"/>`;
+    if((mode === 'line' || mode === 'scale') && temp.pts.length === 2) s += seg(temp.pts[0], temp.pts[1], 'tmpl');
+    temp.pts.forEach((p, i) => { const [x, y] = px(p); s += `<circle class="dot" cx="${x}" cy="${y}" r="${(i === 0 && mode === 'poly') ? rr * 1.6 : rr}"/>`; });
+  }
+  scene.innerHTML = s;
+}
+function rectPoly(a, b){
+  const x0 = Math.min(a[0], b[0]), x1 = Math.max(a[0], b[0]), y0 = Math.min(a[1], b[1]), y1 = Math.max(a[1], b[1]);
+  return [[x0, y0], [x1, y0], [x1, y1], [x0, y1]];
+}
+
+/* ---------- 操作のしかた（モード） ---------- */
+const HINTS = {
+  view: () => 'ドラッグで移動、2本指（パソコンはホイール）で拡大・縮小。図形をタップすると選べます。',
+  rect: () => '四角の区画：対角の2点を、ドラッグでつなぎます。移動するときは2本指か「見る・選ぶ」で。',
+  poly: () => `多角形の区画：角を順にタップします（今 ${temp.pts.length}点）。最初の点をもう一度タップするか「閉じて完成」で完成。`,
+  line: () => !temp.line1 ? `線の組：1本目の線の両端を、順にタップします（${temp.pts.length}/2）。` : `線の組：2本目の線の両端を、順にタップします（${temp.pts.length}/2）。`,
+  scale: () => `縮尺：実際の距離がわかる2点を、順にタップします（${temp.pts.length}/2）。`
+};
+function renderHint(){
+  $('#hint-text').textContent = HINTS[mode]();
+  const drawing = mode !== 'view';
+  $('#h-back').hidden = !(drawing && (temp.pts.length || temp.line1));
+  $('#h-close').hidden = !(mode === 'poly' && temp.pts.length >= 3);
+  $('#h-cancel').hidden = !drawing;
+}
+function setMode(m){
+  if(m !== 'view' && !P.map.image){ toast('先に館内図の画像を読み込んでください'); m = 'view'; }
+  mode = m; temp = {pts:[], line1:null, rect:null};
+  $$('.mode').forEach(b => b.classList.toggle('on', b.dataset.mode === m));
+  renderHint(); render();
+}
+$$('.mode').forEach(b => b.addEventListener('click', () => setMode(b.dataset.mode)));
+$('#h-cancel').addEventListener('click', () => setMode('view'));
+$('#h-back').addEventListener('click', () => {
+  if(temp.pts.length) temp.pts.pop();
+  else if(temp.line1){ temp.pts = [temp.line1[0]]; temp.line1 = null; }
+  renderHint(); render();
+});
+$('#h-close').addEventListener('click', finishPoly);
+
+/* ---------- 図形を完成させる ---------- */
+function addZone(poly){
+  const id = nextId('Z', P.zones.map(z => z.zone_id));
+  P.zones.push({zone_id:id, name:'', polygon:poly});
+  sel = {kind:'zone', id};
+  changed(true);
+  setMode('view');
+  focusItem('zone', id, 'name');
+  toast(`区画 ${id} を作りました。名前を入れてください`);
+}
+function finishPoly(){ if(temp.pts.length >= 3) addZone(temp.pts.slice()); }
+function finishPair(line1, line2){
+  const id = nextId('L', P.speed_lines.map(l => l.line_pair_id));
+  const mid = center([center(line1), center(line2)]);
+  const z = P.zones.slice().reverse().find(z => inPoly(mid, z.polygon)); // 2本の線の真ん中を含む区画を、最初の候補にする
+  P.speed_lines.push({line_pair_id:id, zone_id: z ? z.zone_id : '', line1, line2, distance_m:null});
+  sel = {kind:'pair', id};
+  changed(true);
+  setMode('view');
+  focusItem('pair', id, 'distance_m');
+  toast(`線の組 ${id} を作りました。実際の距離（m）を入れてください`);
+}
+function finishScale(a, b){
+  P.map.scale = {a, b, meters:null};
+  sel = {kind:'scale', id:'scale'};
+  changed(true);
+  setMode('view');
+  focusItem('scale', 'scale', 'meters');
+  toast('2点の間の実際の距離（m）を入れてください');
+}
+function handleTap(p, cx, cy){
+  if(mode === 'view'){
+    const el = document.elementFromPoint(cx, cy);
+    const t = el && el.closest && el.closest('[data-sel]');
+    sel = t ? {kind:t.dataset.sel, id:t.dataset.id} : null;
+    render(); renderPanel();
+    if(sel) scrollToItem(sel.kind, sel.id);
+    return;
+  }
+  if(mode === 'poly'){
+    if(temp.pts.length >= 3){
+      const [fx, fy] = toScreen(temp.pts[0]);
+      if(Math.hypot(fx - cx, fy - cy) < 22){ finishPoly(); return; }
+    }
+    temp.pts.push(p);
+  }else if(mode === 'line'){
+    temp.pts.push(p);
+    if(temp.pts.length === 2){
+      if(!temp.line1){ temp.line1 = temp.pts; temp.pts = []; }
+      else{ finishPair(temp.line1, temp.pts); return; }
+    }
+  }else if(mode === 'scale'){
+    temp.pts.push(p);
+    if(temp.pts.length === 2){ finishScale(temp.pts[0], temp.pts[1]); return; }
+  }
+  renderHint(); render();
+}
+
+/* ---------- 指とマウスの操作 ----------
+   1本指：タップ＝点を置く／選ぶ、ドラッグ＝移動（四角の区画のときは四角を描く）
+   2本指：拡大・縮小と移動 */
+const ptrs = new Map();
+let g = null; // 今の操作
+stage.addEventListener('pointerdown', e => {
+  if(!P.map.image) return;
+  stage.setPointerCapture(e.pointerId);
+  ptrs.set(e.pointerId, {x:e.clientX, y:e.clientY});
+  if(ptrs.size === 2){
+    const [a, b] = [...ptrs.values()];
+    temp.rect = null;
+    g = {type:'pinch', vb0:{...vb}, d0:Math.hypot(a.x - b.x, a.y - b.y), m0:{x:(a.x + b.x) / 2, y:(a.y + b.y) / 2}};
+    return;
+  }
+  if(ptrs.size > 2) return;
+  const p = toNorm(e.clientX, e.clientY);
+  g = {type: mode === 'rect' ? 'rect' : 'tap', sx:e.clientX, sy:e.clientY, vb0:{...vb}, p0:p};
+  if(mode === 'rect') temp.rect = [p, p];
+});
+stage.addEventListener('pointermove', e => {
+  if(!ptrs.has(e.pointerId)) return;
+  ptrs.set(e.pointerId, {x:e.clientX, y:e.clientY});
+  if(!g) return;
+  const r = rect();
+  if(g.type === 'pinch' && ptrs.size === 2){
+    const [a, b] = [...ptrs.values()];
+    const d = Math.hypot(a.x - b.x, a.y - b.y) || 1, m = {x:(a.x + b.x) / 2, y:(a.y + b.y) / 2};
+    const v0 = g.vb0, maxS = Math.max(W(), H());
+    const sx = v0.x + (g.m0.x - r.left) / r.width * v0.w, sy = v0.y + (g.m0.y - r.top) / r.height * v0.h;
+    const w = Math.min(maxS * 4, Math.max(maxS * 0.02, v0.w * g.d0 / d)), h = w * r.height / r.width;
+    vb = {x: sx - (m.x - r.left) / r.width * w, y: sy - (m.y - r.top) / r.height * h, w, h};
+    applyVB();
+    return;
+  }
+  const dx = e.clientX - g.sx, dy = e.clientY - g.sy;
+  if(g.type === 'rect'){ temp.rect[1] = toNorm(e.clientX, e.clientY); render(); return; }
+  if(g.type === 'tap' && Math.hypot(dx, dy) > 8) g.type = 'pan'; // 8ピクセル以上動いたら、タップではなく移動とみなす
+  if(g.type === 'pan'){
+    vb = {...vb, x: g.vb0.x - dx / r.width * g.vb0.w, y: g.vb0.y - dy / r.height * g.vb0.h};
+    applyVB();
+  }
+});
+function endPointer(e){
+  if(!ptrs.has(e.pointerId)) return;
+  ptrs.delete(e.pointerId);
+  if(!g) return;
+  if(g.type === 'pinch'){ if(ptrs.size === 0) g = null; return; }
+  if(e.type === 'pointercancel'){ temp.rect = null; g = null; render(); return; }
+  if(g.type === 'rect'){
+    const [a, b] = [toScreen(temp.rect[0]), toScreen(temp.rect[1])];
+    const poly = rectPoly(temp.rect[0], temp.rect[1]);
+    temp.rect = null;
+    if(Math.abs(a[0] - b[0]) > 12 && Math.abs(a[1] - b[1]) > 12) addZone(poly); else render();
+  }else if(g.type === 'tap'){
+    handleTap(g.p0, g.sx, g.sy);
+  }
+  g = null;
+}
+stage.addEventListener('pointerup', endPointer);
+stage.addEventListener('pointercancel', endPointer);
+stage.addEventListener('wheel', e => { if(!P.map.image) return; e.preventDefault(); zoomAt(e.clientX, e.clientY, Math.exp(e.deltaY * 0.0015)); }, {passive:false});
+$('#z-in').addEventListener('click', () => { const r = rect(); zoomAt(r.left + r.width / 2, r.top + r.height / 2, 0.7); });
+$('#z-out').addEventListener('click', () => { const r = rect(); zoomAt(r.left + r.width / 2, r.top + r.height / 2, 1 / 0.7); });
+$('#z-fit').addEventListener('click', fitAll);
+
+/* ---------- 右（スマホでは下）の一覧 ---------- */
+function renderPanel(){
+  const m = metersPerPx();
+  let h = '';
+  h += `<h2>計画</h2>
+    <label class="field">計画のID（記録とファイル名に使う）<input data-f="plan_id" value="${esc(P.plan_id)}" autocomplete="off"></label>
+    <label class="field">施設の名前<input data-f="facility_name" value="${esc(P.facility.name)}" autocomplete="off"></label>
+    <div class="row2">
+      <label class="field">施設の種類<select data-f="facility_kind">${KINDS.map(([k, v]) => `<option value="${k}"${P.facility.kind === k ? ' selected' : ''}>${v}</option>`).join('')}</select></label>
+      <label class="field">数える間隔（分）<input data-f="interval" type="number" inputmode="numeric" min="1" value="${esc(P.settings.count_interval_min)}"></label>
+    </div>`;
+
+  h += `<h2>館内図</h2><p class="note">${P.map.image ? `${P.map.width_px} × ${P.map.height_px} ピクセル、約${Math.round(P.map.image.length * 0.75 / 1024)}KB` : 'まだ読み込んでいません。'}</p>
+    <label class="btn">${P.map.image ? '画像を差し替える' : '館内図の画像を選ぶ'}<input type="file" accept="image/*" data-img hidden></label>`;
+
+  h += `<h2>縮尺</h2>`;
+  if(!P.map.scale){
+    h += `<p class="note">上の「縮尺」を選び、実際の距離がわかる2点をタップします。なくても計画は作れます。入れておくと、線の組の距離を地図から見積もれます。</p>`;
+  }else{
+    h += `<div class="item${isSel('scale') ? ' sel' : ''}" data-item="scale" data-id="scale">
+      <div class="item-head"><span class="tag s">縮尺</span><span class="sp"></span><button class="del" data-del="scale" data-id="scale">削除</button></div>
+      <label class="field">2点の間の実際の距離（m）<input data-f="scale_m" data-focus="scale:scale:meters" type="number" inputmode="decimal" step="0.1" min="0" value="${esc(P.map.scale.meters ?? '')}"></label>
+      <p class="note">${m ? `地図の上で 1 m ＝ 約${(1 / m).toFixed(1)} ピクセル` : '距離を入れると、縮尺が決まります。'}</p></div>`;
+  }
+
+  h += `<h2>区画（${P.zones.length}）</h2>`;
+  if(!P.zones.length) h += `<p class="note">上の「四角の区画」か「多角形の区画」で、地図の上に描きます。</p>`;
+  P.zones.forEach((z, i) => {
+    h += `<div class="item${isSel('zone', z.zone_id) ? ' sel' : ''}" data-item="zone" data-id="${esc(z.zone_id)}">
+      <div class="item-head"><span class="tag z">${esc(z.zone_id)}</span><span class="sp"></span>
+        <button data-show="zone" data-id="${esc(z.zone_id)}">地図で見る</button>
+        <button class="del" data-del="zone" data-id="${esc(z.zone_id)}">削除</button></div>
+      <div class="row2">
+        <label class="field">ID<input data-zf="zone_id" data-i="${i}" value="${esc(z.zone_id)}" autocomplete="off"></label>
+        <label class="field">名前<input data-zf="name" data-i="${i}" data-focus="zone:${esc(z.zone_id)}:name" value="${esc(z.name)}" placeholder="例：恐竜展示室" autocomplete="off"></label>
+      </div></div>`;
+  });
+
+  h += `<h2>歩く速さの線の組（${P.speed_lines.length}）</h2>`;
+  if(!P.speed_lines.length) h += `<p class="note">上の「線の組」を選び、1本目の両端 → 2本目の両端の順に4点をタップします。</p>`;
+  P.speed_lines.forEach((l, i) => {
+    const est = m ? pairGapPx(l) * m : null;
+    h += `<div class="item${isSel('pair', l.line_pair_id) ? ' sel' : ''}" data-item="pair" data-id="${esc(l.line_pair_id)}">
+      <div class="item-head"><span class="tag l">${esc(l.line_pair_id)}</span><span class="sp"></span>
+        <button data-show="pair" data-id="${esc(l.line_pair_id)}">地図で見る</button>
+        <button class="del" data-del="pair" data-id="${esc(l.line_pair_id)}">削除</button></div>
+      <div class="row2">
+        <label class="field">ID<input data-lf="line_pair_id" data-i="${i}" value="${esc(l.line_pair_id)}" autocomplete="off"></label>
+        <label class="field">区画<select data-lf="zone_id" data-i="${i}"><option value="">（なし）</option>${P.zones.map(z => `<option value="${esc(z.zone_id)}"${z.zone_id === l.zone_id ? ' selected' : ''}>${esc(z.zone_id)} ${esc(z.name)}</option>`).join('')}</select></label>
+      </div>
+      <label class="field">実際の距離（m）<input data-lf="distance_m" data-i="${i}" data-focus="pair:${esc(l.line_pair_id)}:distance_m" type="number" inputmode="decimal" step="0.1" min="0" value="${esc(l.distance_m ?? '')}"></label>
+      ${est ? `<button class="suggest" data-use="${i}" data-est="${est.toFixed(1)}">地図からの見積もり 約${est.toFixed(1)} m を入れる</button>` : ''}
+    </div>`;
+  });
+  if(P.speed_lines.length) h += `<p class="note">距離は、メジャーなどで実際に測った値を優先してください。地図からの見積もりは、館内図の歪みの分だけずれます。</p>`;
+
+  h += `<h2>保存と書き出し</h2>
+    <p class="note" id="save-state">${esc(saveText || '作業中の計画は、このブラウザに自動で保存されます。')}</p>
+    <button class="btn primary" id="p-export">JSONを書き出す</button>
+    <button class="btn" id="p-share" hidden>共有して保存</button>
+    <label class="btn">JSONを読み込む<input type="file" accept=".json,application/json" data-json hidden></label>
+    <button class="btn del" id="p-new">新しい計画を作る</button>
+    <p class="note">記録のアプリでは、書き出したJSONを「計画JSONを読み込む」で読み込みます。</p>`;
+  panel.innerHTML = h;
+  try{
+    const f = new File(['{}'], 't.json', {type:'application/json'});
+    $('#p-share').hidden = !(navigator.canShare && navigator.canShare({files:[f]}));
+  }catch(e){}
+}
+function itemEl(kind, id){ return $$('.item').find(el => el.dataset.item === kind && el.dataset.id === id); }
+function scrollToItem(kind, id){ const el = itemEl(kind, id); if(el) el.scrollIntoView({block:'nearest', behavior:'smooth'}); }
+function focusItem(kind, id, field){
+  const inp = $$('[data-focus]').find(el => el.dataset.focus === `${kind}:${id}:${field}`);
+  if(inp){ inp.scrollIntoView({block:'center'}); inp.focus({preventScroll:true}); }
+}
+// 変更のあとに呼ぶ。panelToo が true なら一覧も描き直す（文字の入力中は描き直さない＝入力欄が閉じないように）
+function changed(panelToo){ render(); if(panelToo) renderPanel(); scheduleSave(); }
+
+panel.addEventListener('input', e => {
+  const t = e.target, i = +t.dataset.i;
+  switch(t.dataset.f){
+    case 'plan_id': P.plan_id = t.value.trim(); break;
+    case 'facility_name': P.facility.name = t.value; break;
+    case 'interval': P.settings.count_interval_min = numOrNull(t.value) || 5; break;
+    case 'scale_m': P.map.scale.meters = numOrNull(t.value); break;
+  }
+  if(t.dataset.zf === 'name') P.zones[i].name = t.value;
+  if(t.dataset.lf === 'distance_m') P.speed_lines[i].distance_m = numOrNull(t.value);
+  changed(false);
+});
+panel.addEventListener('change', e => {
+  const t = e.target, i = +t.dataset.i;
+  if(t.dataset.f === 'facility_kind'){ P.facility.kind = t.value; changed(false); }
+  else if(t.dataset.f === 'scale_m') changed(true); // 縮尺が決まったら、見積もりを出し直す
+  else if(t.dataset.zf === 'zone_id') renameZone(i, t.value.trim());
+  else if(t.dataset.lf === 'line_pair_id') renamePair(i, t.value.trim());
+  else if(t.dataset.lf === 'zone_id'){ P.speed_lines[i].zone_id = t.value; changed(false); }
+  else if('img' in t.dataset){ const f = t.files[0]; t.value = ''; if(f) loadImage(f); }
+  else if('json' in t.dataset){ const f = t.files[0]; t.value = ''; if(f) importJSON(f); }
+});
+panel.addEventListener('click', e => {
+  const b = e.target.closest('button');
+  if(b){
+    if(b.dataset.del) delItem(b.dataset.del, b.dataset.id);
+    else if(b.dataset.show) showItem(b.dataset.show, b.dataset.id);
+    else if(b.dataset.use !== undefined){ P.speed_lines[+b.dataset.use].distance_m = +b.dataset.est; changed(true); }
+    else if(b.id === 'p-export') exportPlan(false);
+    else if(b.id === 'p-share') exportPlan(true);
+    else if(b.id === 'p-new') newPlanFlow();
+    return;
+  }
+  if(e.target.closest('input,select,label')) return;
+  const it = e.target.closest('[data-item]');
+  if(it){ sel = {kind:it.dataset.item, id:it.dataset.id}; render(); renderPanel(); }
+});
+// 区画のIDを変えたら、その区画を指している線の組も書き換える
+function renameZone(i, nv){
+  const old = P.zones[i].zone_id;
+  if(!nv || nv === old){ renderPanel(); return; }
+  if(P.zones.some(z => z.zone_id === nv)){ toast(`${nv} はすでに使われています`); renderPanel(); return; }
+  P.zones[i].zone_id = nv;
+  P.speed_lines.forEach(l => { if(l.zone_id === old) l.zone_id = nv; });
+  if(isSel('zone', old)) sel.id = nv;
+  changed(true);
+}
+function renamePair(i, nv){
+  const old = P.speed_lines[i].line_pair_id;
+  if(!nv || nv === old){ renderPanel(); return; }
+  if(P.speed_lines.some(l => l.line_pair_id === nv)){ toast(`${nv} はすでに使われています`); renderPanel(); return; }
+  P.speed_lines[i].line_pair_id = nv;
+  if(isSel('pair', old)) sel.id = nv;
+  changed(true);
+}
+function delItem(kind, id){
+  if(kind === 'scale'){ if(!confirm('縮尺を削除しますか。')) return; P.map.scale = null; }
+  if(kind === 'zone'){
+    if(!confirm(`区画 ${id} を削除しますか。`)) return;
+    P.zones = P.zones.filter(z => z.zone_id !== id);
+    P.speed_lines.forEach(l => { if(l.zone_id === id) l.zone_id = ''; });
+  }
+  if(kind === 'pair'){ if(!confirm(`線の組 ${id} を削除しますか。`)) return; P.speed_lines = P.speed_lines.filter(l => l.line_pair_id !== id); }
+  if(isSel(kind, id)) sel = null;
+  changed(true);
+}
+function showItem(kind, id){
+  sel = {kind, id};
+  if(kind === 'zone'){ const z = P.zones.find(z => z.zone_id === id); if(z) fitPoints(z.polygon); }
+  if(kind === 'pair'){ const l = P.speed_lines.find(l => l.line_pair_id === id); if(l) fitPoints([...l.line1, ...l.line2]); }
+  renderPanel();
+}
+
+/* ---------- 館内図の画像 ----------
+   長い辺を2000ピクセルまでに縮め、JPEGにする。JSONを軽くして、端末に保存しやすくするため */
+async function loadImage(file){
+  try{
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.src = url;
+    await img.decode();
+    const k = Math.min(1, 2000 / Math.max(img.naturalWidth, img.naturalHeight));
+    const w = Math.round(img.naturalWidth * k), h = Math.round(img.naturalHeight * k);
+    const c = document.createElement('canvas'); c.width = w; c.height = h;
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, w, h); // 透明な部分を白にする（JPEGは透明を持てない）
+    ctx.drawImage(img, 0, 0, w, h);
+    URL.revokeObjectURL(url);
+    const hasShapes = P.zones.length || P.speed_lines.length || P.map.scale;
+    if(hasShapes && P.map.width_px){
+      const oldR = P.map.height_px / P.map.width_px, newR = h / w;
+      const msg = Math.abs(oldR - newR) / oldR > 0.02
+        ? '新しい画像は、前の画像と縦横の比率が違います。描いた区画や線の位置がずれます。差し替えますか。'
+        : '画像を差し替えます。描いた区画や線は、画像の中の同じ割合の位置に残ります。';
+      if(!confirm(msg)) return;
+    }
+    P.map.image = c.toDataURL('image/jpeg', 0.85);
+    P.map.width_px = w; P.map.height_px = h;
+    setImage();
+    vb.w = 0; fitAll();
+    changed(true);
+    toast('館内図を読み込みました');
+  }catch(e){
+    toast('画像を読み込めませんでした。JPEGかPNGの画像を選んでください');
+  }
+}
+function setImage(){
+  const im = $('#mapimg');
+  const href = P.map.image || '';
+  im.setAttribute('href', href);
+  im.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', href);
+  im.setAttribute('width', P.map.width_px || 0);
+  im.setAttribute('height', P.map.height_px || 0);
+}
+
+/* ---------- 書き出し・読み込み ---------- */
+function problems(){
+  const out = [];
+  if(!P.plan_id) out.push('計画のIDが空です');
+  if(!P.facility.name.trim()) out.push('施設の名前が空です');
+  if(!P.map.image) out.push('館内図がありません');
+  if(!P.zones.length) out.push('区画がありません');
+  P.zones.forEach(z => { if(!z.name.trim()) out.push(`${z.zone_id} の名前が空です`); });
+  P.speed_lines.forEach(l => {
+    if(!l.zone_id) out.push(`${l.line_pair_id} の区画が決まっていません`);
+    if(!(l.distance_m > 0)) out.push(`${l.line_pair_id} の実際の距離が入っていません`);
+  });
+  if(P.map.scale && !(P.map.scale.meters > 0)) out.push('縮尺の距離が入っていません');
+  return out;
+}
+async function exportPlan(share){
+  const pr = problems();
+  if(pr.length && !confirm(`次の点が残っています。\n\n・${pr.join('\n・')}\n\nこのまま書き出しますか。`)) return;
+  const name = `plan_${P.plan_id.replace(/[\\/:*?"<>|\s]+/g, '_') || 'noname'}.json`.replace(/^plan_plan_/, 'plan_');
+  const f = new File([JSON.stringify(P, null, 1)], name, {type:'application/json'});
+  if(share){ try{ await navigator.share({files:[f]}); }catch(e){} return; }
+  const url = URL.createObjectURL(f), a = document.createElement('a');
+  a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+  toast(`${name} を書き出しました`);
+}
+async function importJSON(file){
+  try{
+    const p = JSON.parse(await file.text());
+    if(p.schema !== 'visitor-obs-plan' || !Array.isArray(p.zones)) throw new Error('schema');
+    if((P.zones.length || P.map.image) && !confirm('今の計画を、読み込む計画で置き換えます。よろしいですか。')) return;
+    P = normalize(p); sel = null;
+    setImage(); vb.w = 0; fitAll();
+    setMode('view'); changed(true);
+    toast(`計画「${P.plan_id}」を読み込みました`);
+  }catch(e){
+    toast('計画JSONを読めませんでした。このページで書き出したJSONを選んでください');
+  }
+}
+function newPlanFlow(){
+  if(!confirm('今の計画を消して、新しく作り始めます。必要なら、先にJSONを書き出してください。')) return;
+  P = newPlan(); sel = null; vb = {x:0, y:0, w:0, h:0};
+  setImage(); setMode('view'); changed(true);
+}
+$('#empty input[data-img]').addEventListener('change', e => { const f = e.target.files[0]; e.target.value = ''; if(f) loadImage(f); });
+
+/* ---------- お知らせ ---------- */
+let toastTimer = null;
+function toast(msg){
+  const t = $('#toast'); t.textContent = msg; t.hidden = false;
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.hidden = true; }, 2800);
+}
+
+/* ---------- 起動：前回の作業の続きを開く ---------- */
+(async function init(){
+  try{ const d = await idbGet('kv', 'draft'); P = d ? normalize(d) : newPlan(); }
+  catch(e){ P = newPlan(); }
+  setImage(); renderHint(); renderPanel();
+  requestAnimationFrame(() => { fitAll(); render(); });
+  if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+})();
+</script>
+</body>
+</html>
