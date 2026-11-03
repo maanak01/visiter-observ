@@ -9,7 +9,7 @@
 <meta name="color-scheme" content="light dark">
 <title>行動観察</title>
 <style>
-/* ===== 色：測り方ごとに色を固定し、タブ・ボタン・一覧で同じ色を使う ===== */
+
 :root{
   --bg:#EEF1F0; --surface:#FFFFFF; --ink:#14201D; --muted:#5B6966; --line:#C9D2CF;
   --dwell:#0E6B5F; --dwell-ink:#FFFFFF;
@@ -78,7 +78,7 @@ label > input, label > select, label > textarea{margin-top:4px;color:var(--ink)}
 .fileline{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px}
 .filebtn{display:inline-flex;align-items:center;border:1.5px solid var(--line);border-radius:12px;padding:8px 14px;min-height:44px;color:var(--ink);font-size:16px;margin:0}
 
-/* ===== 記録画面 ===== */
+
 .rec-head{display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid var(--line);background:var(--surface)}
 .rec-head .zone{font-size:20px;font-weight:700;line-height:1.2}
 .rec-head > div{flex:1;min-width:0}
@@ -119,7 +119,7 @@ label > input, label > select, label > textarea{margin-top:4px;color:var(--ink)}
 .inline > button{min-height:48px;padding:0 18px;border-radius:12px;font-weight:700;flex:none}
 .section{padding:14px 0;border-bottom:1px solid var(--line)}
 
-/* ===== 下から出るシート ===== */
+
 .modal{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:flex-end;z-index:20}
 .sheet{background:var(--surface);width:100%;max-width:640px;margin:0 auto;border-radius:20px 20px 0 0;
   padding:18px 18px calc(18px + env(safe-area-inset-bottom));max-height:92%;overflow-y:auto}
@@ -154,7 +154,7 @@ label > input, label > select, label > textarea{margin-top:4px;color:var(--ink)}
 </head>
 <body>
 
-<!-- ===================== 開始画面 ===================== -->
+
 <section id="home" class="screen">
   <div class="scroll"><div class="pad">
     <h1>行動観察</h1>
@@ -195,7 +195,7 @@ label > input, label > select, label > textarea{margin-top:4px;color:var(--ink)}
   </div></div>
 </section>
 
-<!-- ===================== 記録画面 ===================== -->
+
 <section id="rec" class="screen">
   <header class="rec-head">
     <div>
@@ -269,7 +269,7 @@ label > input, label > select, label > textarea{margin-top:4px;color:var(--ink)}
   </nav>
 </section>
 
-<!-- ===================== ふりかえり画面 ===================== -->
+
 <section id="end" class="screen">
   <div class="scroll"><div class="pad">
     <h1>観察のふりかえり</h1>
@@ -290,7 +290,7 @@ label > input, label > select, label > textarea{margin-top:4px;color:var(--ink)}
   </div></div>
 </section>
 
-<!-- ===================== 人数を数えるシート ===================== -->
+
 <div id="count-modal" class="modal" hidden>
   <div class="sheet" id="count-sheet">
     <h2>人数を数える</h2>
@@ -313,7 +313,7 @@ label > input, label > select, label > textarea{margin-top:4px;color:var(--ink)}
   </div>
 </div>
 
-<!-- ===================== グループの構成シート ===================== -->
+
 <div id="group-sheet" class="modal" hidden>
   <div class="sheet">
     <div class="sheet-head"><h2 id="g-title"></h2><button id="g-close" class="ghost">閉じる</button></div>
@@ -331,12 +331,7 @@ label > input, label > select, label > textarea{margin-top:4px;color:var(--ink)}
 
 <script>
 'use strict';
-/* =========================================================
-   保存のしくみ
-   - 観察1回ぶんを1つのキー（vobs:obs:観察ID）に丸ごと保存する
-   - 記録は「追記だけ」。取り消しは行を消さず voided=true にする
-   - 画面の状態（計測中のグループなど）は、記録から毎回計算し直す
-   ========================================================= */
+
 const K_OBS = 'vobs:obs:', K_PLAN = 'vobs:plan', K_CUR = 'vobs:current', K_EXP = 'vobs:lastExport';
 const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
@@ -347,10 +342,10 @@ let audioCtx = null, wakeLock = null, desire = null, saveOk = true;
 const REL = {solo:'一人', couple:'恋人', friends:'友人', family:'家族', tour:'団体', unknown:'不明'};
 const MEM = {child:'子ども', elder:'高齢者'};
 const SIZES = [[1,'1'],[2,'2'],[3,'3'],[4,'4'],[5,'5+']];
-// 取り消しの対象にしない出来事（自動で入るもの、区切り、ふりかえり）
+
 const NO_UNDO = new Set(['session_start','session_end','count_prompt','self_est_min','self_desire','self_comment']);
 
-/* ---------- 時刻 ---------- */
+
 function pad(n, w = 2){ return String(n).padStart(w, '0'); }
 function fmtLocal(t){
   const d = new Date(t), off = -d.getTimezoneOffset(), a = Math.abs(off);
@@ -362,7 +357,7 @@ function stamp(t = Date.now()){
 }
 function esc(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
-/* ---------- 端末への保存 ---------- */
+
 function readJSON(k){ try{ const v = localStorage.getItem(k); return v ? JSON.parse(v) : null; }catch(e){ return null; } }
 function writeJSON(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); return true; }catch(e){ return false; } }
 function saveObs(){
@@ -379,7 +374,7 @@ function listObs(){
   return out.sort((a, b) => a.started_ms - b.started_ms);
 }
 
-/* ---------- 記録の追加（すべての記録はここを通る） ---------- */
+
 function addEvent(type, o = {}){
   const ev = {
     event_id: obs.events.length + 1,
@@ -390,16 +385,16 @@ function addEvent(type, o = {}){
     value_text: o.text ?? null,
     voided: false
   };
-  if(o.replaces) ev.replaces = o.replaces; // 構成を付け直したとき、前の値の event_id
-  if(o.auto) ev.auto = true;               // 自動で入った記録（取り消しの対象外）
+  if(o.replaces) ev.replaces = o.replaces; 
+  if(o.auto) ev.auto = true;               
   obs.events.push(ev);
   saveObs();
   return ev;
 }
-// 連番：観察の中で通し。取り消した番号も使い回さない
+
 function nextUnit(){ return Math.max(0, ...obs.events.map(e => e.unit_id || 0)) + 1; }
 
-/* ---------- 記録から今の状態を計算する ---------- */
+
 function derive(){
   const dwell = new Map(), speed = new Map(), tags = new Map(), pass = [];
   for(const e of obs.events){
@@ -451,7 +446,7 @@ function describe(e){
   }
 }
 
-/* ---------- 取り消し ---------- */
+
 function undoTarget(){
   for(let i = obs.events.length - 1; i >= 0; i--){
     const e = obs.events[i];
@@ -463,7 +458,7 @@ function undo(){
   const e = undoTarget();
   if(!e) return;
   e.voided = true;
-  if(e.replaces){ // 付け直した構成を取り消したら、前の値に戻す
+  if(e.replaces){ 
     const prev = obs.events.find(x => x.event_id === e.replaces);
     if(prev) prev.voided = false;
   }
@@ -472,7 +467,7 @@ function undo(){
   render();
 }
 
-/* ---------- 画面の描き直し ---------- */
+
 function row(id, t, extra){
   const s = tagSummary(t);
   return `<li class="unit"><span class="num">#${id}</span>`
@@ -492,19 +487,19 @@ function render(){
   const hasStartSync = obs.events.some(e => !e.voided && e.event_type === 'sync_mark' && e.value_text === 'start');
   $('#sync-banner').hidden = hasStartSync || obs.sync_later;
 
-  // 滞在
+  
   $('#dwell-list').innerHTML = d.dwell.size
     ? [...d.dwell.keys()].sort((a, b) => a - b)
         .map(id => row(id, d.tags.get(id), `<button class="rowbtn dwell" data-exit="${id}">出た</button>`)).join('')
     : '<li class="unit empty">「入った」を押すと、計測中のグループがここに並びます。</li>';
 
-  // 立ち止まり
+ 
   $('#pass-list').innerHTML = d.pass.length
     ? d.pass.map(e => row(e.unit_id, d.tags.get(e.unit_id),
         `<span class="badge ${e.value_text === 'stop' ? 'stop' : 'pass'}">${e.value_text === 'stop' ? '立ち止まった' : '通過'}</span>`)).join('')
     : '<li class="unit empty">前を通ったグループごとに、下のどちらかを押します。</li>';
 
-  // 歩く速さ
+
   $('#pair-sel').hidden = obs.line_pairs.length < 2;
   $('#pair-sel').innerHTML = obs.line_pairs.map(p => `<button data-pair="${esc(p)}" class="${p === pair ? 'sel' : ''}">${esc(p)}</button>`).join('');
   $('#act-line1').textContent = obs.line_pairs.length < 2 ? '1本目を通った' : `1本目を通った（${pair}）`;
@@ -523,18 +518,18 @@ function setTab(t){
 }
 function show(id){ $$('.screen').forEach(s => s.classList.toggle('on', s.id === id)); }
 
-/* ---------- 押した手応え ---------- */
+
 let lastTap = 0;
 function guard(btn){
   const now = performance.now();
-  if(now - lastTap < 150) return false; // 指が触れた拍子の二重押しを防ぐ
+  if(now - lastTap < 150) return false; 
   lastTap = now;
   btn.classList.add('hit');
   setTimeout(() => btn.classList.remove('hit'), 140);
   return true;
 }
 
-/* ---------- 現場の操作 ---------- */
+
 $('#act-enter').addEventListener('click', ev => {
   if(!guard(ev.currentTarget)) return;
   const id = nextUnit();
@@ -579,7 +574,7 @@ $('#panes').addEventListener('click', ev => {
 $$('.tabs button').forEach(b => b.addEventListener('click', () => setTab(b.dataset.tab)));
 $('#undo-btn').addEventListener('click', undo);
 
-/* ---------- 時刻合わせ ---------- */
+
 function sync(text){
   addEvent('sync_mark', {text});
   render();
@@ -592,7 +587,7 @@ $('#sync-extra').addEventListener('click', () => {
   sync(hasStart ? 'extra' : 'start');
 });
 
-/* ---------- 環境の値・写真 ---------- */
+
 function saveNumber(inputSel, type, unitLabel){
   const v = $(inputSel).value.trim();
   const n = Number(v);
@@ -612,7 +607,7 @@ $('#photo-save').addEventListener('click', () => {
   toast('写真を撮った時刻を記録しました');
 });
 
-/* ---------- グループの構成 ---------- */
+
 function openGroup(id){ groupTarget = id; $('#group-sheet').hidden = false; renderGroup(); }
 function renderGroup(){
   const t = derive().tags.get(groupTarget) || {size:null, rel:null, mem:new Map()};
@@ -624,7 +619,7 @@ function renderGroup(){
   $('#g-mem').innerHTML = Object.entries(MEM).map(([k, v]) =>
     `<button class="choice${t.mem.has(k) ? ' sel' : ''}" data-mem="${k}">${v}</button>`).join('');
 }
-// 関係と人数は1つだけ。付け直すと前の値を voided にして、新しい値を足す
+
 function setTag(type, num, text){
   const cur = obs.events.filter(e => !e.voided && e.event_type === type && e.unit_id === groupTarget
                                      && (type !== 'group_member' || e.value_text === text));
@@ -645,7 +640,7 @@ $('#group-sheet').addEventListener('click', ev => {
   else if(b.dataset.mem) setTag('group_member', null, b.dataset.mem);
 });
 
-/* ---------- 人数を数える ---------- */
+
 function openCount(auto){
   $('#cnt-present').value = 0;
   $('#cnt-phone').value = 0;
@@ -676,20 +671,20 @@ $('#count-save').addEventListener('click', () => {
 $('#count-skip').addEventListener('click', () => { $('#count-modal').hidden = true; });
 $('#count-now').addEventListener('click', () => openCount(false));
 
-// 1秒ごとに、数え上げの時刻が来たかを確かめる
+
 function tick(){
   if(!obs || obs.ended_ms || !$('#count-modal').hidden) return;
   const now = Date.now();
   if(now < obs.next_count_ms) return;
   const iv = obs.count_interval_min * 60000;
-  while(obs.next_count_ms <= now) obs.next_count_ms += iv; // 画面が消えていて逃した回はまとめて1回にする
+  while(obs.next_count_ms <= now) obs.next_count_ms += iv; 
   addEvent('count_prompt', {auto:true});
   openCount(true);
   beep();
 }
 setInterval(tick, 1000);
 
-/* ---------- 音と画面の点灯 ---------- */
+
 function initAudio(){
   try{
     if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -716,7 +711,7 @@ document.addEventListener('visibilitychange', () => {
   if(document.visibilityState === 'visible' && obs && !obs.ended_ms){ keepAwake(); tick(); render(); }
 });
 
-/* ---------- 観察の開始 ---------- */
+
 function startObs(){
   let facility, zone_id, zone_label;
   if(plan){
@@ -755,7 +750,7 @@ function startObs(){
 }
 $('#start-btn').addEventListener('click', startObs);
 
-/* ---------- 観察の終了とふりかえり ---------- */
+
 $('#end-btn').addEventListener('click', () => {
   const d = derive();
   let msg = '観察を終えますか。';
@@ -805,7 +800,7 @@ $('#finish-btn').addEventListener('click', () => {
   toast('保存しました。区切りのよいところでCSVを書き出してください');
 });
 
-/* ---------- 計画JSON ---------- */
+
 $('#plan-file').addEventListener('change', async ev => {
   const f = ev.target.files[0];
   ev.target.value = '';
@@ -813,7 +808,7 @@ $('#plan-file').addEventListener('change', async ev => {
   try{
     const p = JSON.parse(await f.text());
     if(!Array.isArray(p.zones) || !p.zones.length) throw new Error('zones');
-    if(p.map) delete p.map.image; // 館内図の画像は記録画面では使わないので、端末の保存容量を空けておく
+    if(p.map) delete p.map.image; 
     plan = p;
     if(!writeJSON(K_PLAN, p)) toast('計画を端末に保存できませんでした');
     renderHome();
@@ -831,7 +826,7 @@ function fillLinesFromPlan(){
   $('#lines-input').value = ls.length ? ls.join(', ') : 'L01';
 }
 
-/* ---------- 書き出し ---------- */
+
 const CSV_COLS = ['observation_id','plan_id','facility','zone_id','event_id','event_type','unit_id','t_epoch_ms','t_local','value_num','value_text','voided'];
 function cell(v){ const s = String(v); return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }
 function buildCSV(){
@@ -843,7 +838,7 @@ function buildCSV(){
                .map(cell).join(','));
     }
   }
-  // 先頭のBOMは、Excelで開いたときの文字化けを防ぐため
+
   return '\uFEFF' + out.join('\r\n') + '\r\n';
 }
 function csvFile(){ return new File([buildCSV()], `vobs_${stamp()}.csv`, {type:'text/csv'}); }
@@ -858,7 +853,7 @@ $('#export-share').addEventListener('click', async () => {
   try{ await navigator.share({files:[csvFile()]}); markExported(); }catch(e){}
 });
 
-/* ---------- 開始画面 ---------- */
+
 function renderHome(){
   $('#plan-status').textContent = plan
     ? `計画「${plan.plan_id || '名前なし'}」（${(plan.facility && plan.facility.name) || '施設名なし'}、区画 ${plan.zones.length}個）を使います。`
@@ -897,7 +892,7 @@ function renderHome(){
 }
 function showHome(){ renderHome(); show('home'); }
 
-// 練習の記録などを消す。端末から完全に消えるので、確認を2つ重ねる
+
 $('#obs-list').addEventListener('click', ev => {
   const b = ev.target.closest('button[data-del]');
   if(!b) return;
@@ -915,14 +910,14 @@ $('#obs-list').addEventListener('click', ev => {
   toast('削除しました');
 });
 
-/* ---------- お知らせ ---------- */
+
 let toastTimer = null;
 function toast(msg, actLabel, act){
   const t = $('#toast'), b = t.querySelector('button');
   t.querySelector('span').textContent = msg;
   if(actLabel){ b.hidden = false; b.textContent = actLabel; b.onclick = () => { t.hidden = true; act(); }; }
   else b.hidden = true;
-  // 記録画面では、大きなボタンのすぐ上に出す
+
   if($('#rec').classList.contains('on')){
     const top = $('#actions').getBoundingClientRect().top;
     t.style.bottom = (window.innerHeight - top + 10) + 'px';
@@ -934,7 +929,7 @@ function toast(msg, actLabel, act){
   toastTimer = setTimeout(() => { t.hidden = true; }, actLabel ? 4000 : 2400);
 }
 
-/* ---------- 起動：途中の観察があれば、そこから再開する ---------- */
+
 (function init(){
   plan = readJSON(K_PLAN);
   const cur = localStorage.getItem(K_CUR);
