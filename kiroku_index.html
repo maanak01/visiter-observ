@@ -1,0 +1,953 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="行動観察">
+<meta name="color-scheme" content="light dark">
+<title>行動観察</title>
+<style>
+/* ===== 色：測り方ごとに色を固定し、タブ・ボタン・一覧で同じ色を使う ===== */
+:root{
+  --bg:#EEF1F0; --surface:#FFFFFF; --ink:#14201D; --muted:#5B6966; --line:#C9D2CF;
+  --dwell:#0E6B5F; --dwell-ink:#FFFFFF;
+  --pass:#D5DCDA; --pass-ink:#14201D;
+  --stop:#E3A21A; --stop-ink:#1D1600;
+  --speed:#3B4BB0; --speed-ink:#FFFFFF;
+  --other:#3A4744; --other-ink:#FFFFFF;
+  --danger:#B3261E; --ok:#2E7D4F;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#0C1211; --surface:#161E1D; --ink:#E5ECEA; --muted:#93A29E; --line:#2B3735;
+    --dwell:#2FA896; --dwell-ink:#04120F;
+    --pass:#2E3A38; --pass-ink:#E5ECEA;
+    --stop:#F0B43A; --stop-ink:#1D1600;
+    --speed:#8392F7; --speed-ink:#0A0E26;
+    --other:#C3CFCC; --other-ink:#0C1211;
+    --danger:#FF7B72; --ok:#5CC48A;
+    color-scheme: dark;
+  }
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%;margin:0}
+body{
+  background:var(--bg);color:var(--ink);
+  font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;
+  font-size:17px;line-height:1.5;font-variant-numeric:tabular-nums;
+  -webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%;
+  overflow:hidden;
+}
+h1{font-size:28px;line-height:1.25;margin:8px 0 4px;letter-spacing:.02em}
+h2{font-size:19px;margin:0 0 10px}
+h3{font-size:15px;margin:18px 0 8px;color:var(--muted);font-weight:600}
+p{margin:6px 0}
+.muted{color:var(--muted)}
+.small{font-size:14px}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;touch-action:manipulation;-webkit-user-select:none;user-select:none}
+button:disabled{opacity:.35;cursor:default}
+input,textarea,select{
+  font:inherit;color:var(--ink);background:var(--surface);
+  border:1.5px solid var(--line);border-radius:10px;padding:10px 12px;width:100%;
+}
+label{display:block;margin:12px 0 0;font-size:15px;color:var(--muted)}
+label > input, label > select, label > textarea{margin-top:4px;color:var(--ink)}
+:focus-visible{outline:3px solid var(--speed);outline-offset:2px}
+
+.screen{display:none;height:100%;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)}
+.screen.on{display:flex;flex-direction:column}
+.scroll{overflow-y:auto;-webkit-overflow-scrolling:touch;flex:1;min-height:0}
+.pad{padding:16px 18px 40px;max-width:640px;width:100%;margin:0 auto}
+.block{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:16px;margin:18px 0}
+
+/* ===== ボタン ===== */
+.big{display:block;width:100%;min-height:96px;border-radius:18px;font-size:24px;font-weight:700;letter-spacing:.04em}
+.mid{display:block;width:100%;min-height:56px;border-radius:14px;font-size:18px;font-weight:600;margin-top:10px}
+.dwell{background:var(--dwell);color:var(--dwell-ink)}
+.pass{background:var(--pass);color:var(--pass-ink)}
+.stop{background:var(--stop);color:var(--stop-ink)}
+.speed{background:var(--speed);color:var(--speed-ink)}
+.other{background:var(--other);color:var(--other-ink)}
+.ghost{border:1.5px solid var(--line);border-radius:12px;padding:8px 14px;min-height:44px}
+.hit{filter:brightness(1.25)}
+@media (prefers-color-scheme: dark){ .hit{filter:brightness(.7)} }
+.fileline{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px}
+.filebtn{display:inline-flex;align-items:center;border:1.5px solid var(--line);border-radius:12px;padding:8px 14px;min-height:44px;color:var(--ink);font-size:16px;margin:0}
+
+/* ===== 記録画面 ===== */
+.rec-head{display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid var(--line);background:var(--surface)}
+.rec-head .zone{font-size:20px;font-weight:700;line-height:1.2}
+.rec-head > div{flex:1;min-width:0}
+.savebad{color:var(--danger);font-weight:600}
+.lastbar{display:flex;align-items:center;gap:12px;padding:10px 16px;background:var(--surface);border-bottom:1px solid var(--line);min-height:64px}
+.lastbar #last-desc{flex:1;font-size:17px}
+.undo{border:2px solid var(--danger);color:var(--danger);border-radius:12px;padding:8px 16px;min-height:48px;font-weight:700}
+.banner{margin:10px 16px 0;padding:12px 14px;border-radius:14px;background:var(--surface);border:2px solid var(--speed)}
+.banner .row{display:flex;gap:10px;margin-top:8px}
+.banner .row button{flex:1}
+.main{padding:8px 16px 16px}
+.pane{display:none}
+.pane.on{display:block}
+.units{list-style:none;margin:0;padding:0}
+.unit{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line)}
+.unit .num{font-size:24px;font-weight:700;min-width:3.2em}
+.tagbtn{flex:1;text-align:left;min-height:48px;border:1.5px dashed var(--line);border-radius:12px;padding:6px 12px;font-size:15px;color:var(--muted)}
+.tagbtn.has{border-style:solid;color:var(--ink)}
+.rowbtn{min-height:56px;min-width:88px;border-radius:14px;font-size:19px;font-weight:700;padding:0 14px}
+.badge{font-size:15px;font-weight:600;padding:2px 10px;border-radius:999px}
+.empty{color:var(--muted);padding:24px 4px;border:0}
+.seg{display:flex;gap:8px;margin:6px 0 10px;flex-wrap:wrap}
+.seg button{border:1.5px solid var(--line);border-radius:12px;min-height:44px;padding:4px 16px}
+.seg button.sel{background:var(--speed);color:var(--speed-ink);border-color:var(--speed)}
+.actions{padding:10px 16px 8px;border-top:1px solid var(--line);background:var(--bg)}
+.actions > div{display:none}
+.actions > div.on{display:block}
+.actions > div.two.on{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.tabs{display:grid;grid-template-columns:repeat(4,1fr);background:var(--surface);border-top:1px solid var(--line)}
+.tabs button{min-height:56px;font-size:16px;font-weight:600;color:var(--muted);border-top:4px solid transparent}
+.tabs button.on{color:var(--ink)}
+.tabs button[data-tab="dwell"].on{border-top-color:var(--dwell)}
+.tabs button[data-tab="pass"].on{border-top-color:var(--stop)}
+.tabs button[data-tab="speed"].on{border-top-color:var(--speed)}
+.tabs button[data-tab="other"].on{border-top-color:var(--other)}
+.inline{display:flex;gap:10px;align-items:flex-end}
+.inline > label{flex:1;margin-top:0}
+.inline > button{min-height:48px;padding:0 18px;border-radius:12px;font-weight:700;flex:none}
+.section{padding:14px 0;border-bottom:1px solid var(--line)}
+
+/* ===== 下から出るシート ===== */
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:flex-end;z-index:20}
+.sheet{background:var(--surface);width:100%;max-width:640px;margin:0 auto;border-radius:20px 20px 0 0;
+  padding:18px 18px calc(18px + env(safe-area-inset-bottom));max-height:92%;overflow-y:auto}
+.sheet-head{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.sheet-head h2{margin:0}
+.grid{display:grid;gap:8px}
+.g3{grid-template-columns:repeat(3,1fr)}
+.g5{grid-template-columns:repeat(5,1fr)}
+.g2{grid-template-columns:1fr 1fr}
+.choice{min-height:56px;border:1.5px solid var(--line);border-radius:12px;font-size:17px;font-weight:600}
+.choice.sel{background:var(--dwell);color:var(--dwell-ink);border-color:var(--dwell)}
+.stepper{display:grid;grid-template-columns:72px 1fr 72px;gap:8px;margin-top:6px}
+.stepper button{min-height:64px;border-radius:14px;font-size:30px;font-weight:700;background:var(--pass);color:var(--pass-ink)}
+.stepper input{text-align:center;font-size:30px;font-weight:700}
+.alert-ring{animation:ring .6s ease-out 2}
+@keyframes ring{from{box-shadow:0 0 0 0 var(--stop)}to{box-shadow:0 0 0 18px transparent}}
+@media (prefers-reduced-motion: reduce){.alert-ring{animation:none}}
+.err{color:var(--danger);font-weight:600;min-height:1.5em}
+.scale{display:grid;grid-template-columns:repeat(11,1fr);gap:4px;margin-top:6px}
+.scale button{min-height:52px;border:1.5px solid var(--line);border-radius:10px;font-weight:700;font-size:16px;padding:0}
+.scale button.sel{background:var(--dwell);color:var(--dwell-ink);border-color:var(--dwell)}
+.scale-ends{display:flex;justify-content:space-between;font-size:13px;color:var(--muted)}
+.obslist{list-style:none;margin:0;padding:0}
+.obslist li{padding:10px 0;border-bottom:1px solid var(--line);font-size:15px}
+
+#toast{position:fixed;left:12px;right:12px;max-width:616px;margin:0 auto;z-index:30;
+  background:var(--ink);color:var(--bg);border-radius:14px;padding:10px 12px 10px 16px;
+  display:flex;align-items:center;gap:12px;font-size:16px}
+#toast span{flex:1}
+#toast button{background:var(--bg);color:var(--ink);border-radius:10px;min-height:44px;padding:0 16px;font-weight:700}
+</style>
+</head>
+<body>
+
+<!-- ===================== 開始画面 ===================== -->
+<section id="home" class="screen">
+  <div class="scroll"><div class="pad">
+    <h1>行動観察</h1>
+    <p class="muted">記録はこの端末の中だけに保存されます。通信がなくても記録できます。</p>
+
+    <div class="block">
+      <h2>新しい観察</h2>
+      <p id="plan-status" class="small muted"></p>
+      <div class="fileline">
+        <label class="filebtn">計画JSONを読み込む<input type="file" id="plan-file" accept=".json,application/json" hidden></label>
+        <button id="plan-clear" class="ghost" hidden>計画を外す</button>
+      </div>
+
+      <div id="plan-fields" hidden>
+        <label>区画<select id="zone-select"></select></label>
+      </div>
+      <div id="manual-fields">
+        <label>施設の名前<input id="facility-input" autocomplete="off"></label>
+        <label>区画の名前またはID<input id="zone-input" autocomplete="off"></label>
+      </div>
+      <label>歩く速さの線の組（複数あればカンマ区切り）<input id="lines-input" value="L01" autocomplete="off"></label>
+      <label>人数を数える間隔（分）<input id="interval-input" type="number" inputmode="numeric" min="1" value="5"></label>
+      <p id="start-err" class="err"></p>
+      <button id="start-btn" class="big dwell">観察を始める</button>
+    </div>
+
+    <div class="block">
+      <h2>書き出し</h2>
+      <p id="export-status" class="small"></p>
+      <button id="export-dl" class="mid other">CSVをダウンロード</button>
+      <button id="export-share" class="mid other" hidden>共有して保存</button>
+    </div>
+
+    <div class="block">
+      <h2>この端末に保存されている観察</h2>
+      <ul id="obs-list" class="obslist"></ul>
+    </div>
+  </div></div>
+</section>
+
+<!-- ===================== 記録画面 ===================== -->
+<section id="rec" class="screen">
+  <header class="rec-head">
+    <div>
+      <div id="rh-zone" class="zone"></div>
+      <div id="rh-meta" class="small muted"></div>
+    </div>
+    <button id="end-btn" class="ghost">終える</button>
+  </header>
+  <div class="lastbar">
+    <div id="last-desc"></div>
+    <button id="undo-btn" class="undo" disabled>取り消す</button>
+  </div>
+  <div id="sync-banner" class="banner" hidden>
+    <div>CoreS3の時刻合わせの目印と、同時に押してください。</div>
+    <div class="row">
+      <button id="sync-start" class="mid speed" style="margin:0">時刻合わせ</button>
+      <button id="sync-later" class="ghost">あとで</button>
+    </div>
+  </div>
+
+  <div class="scroll"><div class="main" id="panes">
+    <div class="pane" data-pane="dwell"><ul id="dwell-list" class="units"></ul></div>
+    <div class="pane" data-pane="pass">
+      <h3 style="margin-top:8px">直前の記録</h3>
+      <ul id="pass-list" class="units"></ul>
+    </div>
+    <div class="pane" data-pane="speed">
+      <div id="pair-sel" class="seg"></div>
+      <ul id="speed-list" class="units"></ul>
+    </div>
+    <div class="pane" data-pane="other">
+      <div class="section">
+        <button id="count-now" class="mid other" style="margin-top:0">今の人数を数える</button>
+      </div>
+      <div class="section">
+        <div class="inline">
+          <label>音の大きさ（dB）<input id="noise-input" type="number" inputmode="decimal" step="0.1"></label>
+          <button id="noise-save" class="other">記録</button>
+        </div>
+        <div class="inline" style="margin-top:12px">
+          <label>照度（lux）<input id="light-input" type="number" inputmode="decimal" step="1"></label>
+          <button id="light-save" class="other">記録</button>
+        </div>
+      </div>
+      <div class="section">
+        <div class="inline">
+          <label>写真のメモ（任意）<input id="photo-input" autocomplete="off"></label>
+          <button id="photo-save" class="other">撮った</button>
+        </div>
+        <p class="small muted">写真はカメラで撮り、ここでは撮った時刻だけを記録します。</p>
+      </div>
+      <div class="section" style="border:0">
+        <button id="sync-extra" class="mid speed" style="margin-top:0">時刻合わせ（CoreS3と同時に）</button>
+      </div>
+    </div>
+  </div></div>
+
+  <div class="actions" id="actions">
+    <div data-act="dwell"><button id="act-enter" class="big dwell">入った</button></div>
+    <div data-act="pass" class="two">
+      <button id="act-pass" class="big pass">通過</button>
+      <button id="act-stop" class="big stop">立ち止まった</button>
+    </div>
+    <div data-act="speed"><button id="act-line1" class="big speed">1本目を通った</button></div>
+  </div>
+  <nav class="tabs">
+    <button data-tab="dwell">滞在</button>
+    <button data-tab="pass">立ち止まり</button>
+    <button data-tab="speed">歩く速さ</button>
+    <button data-tab="other">その他</button>
+  </nav>
+</section>
+
+<!-- ===================== ふりかえり画面 ===================== -->
+<section id="end" class="screen">
+  <div class="scroll"><div class="pad">
+    <h1>観察のふりかえり</h1>
+    <div class="block">
+      <h2>時刻合わせ（終了）</h2>
+      <p class="small muted">CoreS3の目印と同時に押してください。</p>
+      <button id="sync-end" class="mid speed">時刻合わせ</button>
+      <p id="sync-end-done" class="small"></p>
+    </div>
+    <div class="block">
+      <label style="margin-top:0">この区画に何分いたと思いますか<input id="self-est" type="number" inputmode="decimal" min="0" step="0.5"></label>
+      <h3>ずっといたい度</h3>
+      <div id="desire" class="scale"></div>
+      <div class="scale-ends"><span>まったく</span><span>とても</span></div>
+      <label>一言の感想<textarea id="self-comment" rows="3"></textarea></label>
+    </div>
+    <button id="finish-btn" class="big dwell">保存して終わる</button>
+  </div></div>
+</section>
+
+<!-- ===================== 人数を数えるシート ===================== -->
+<div id="count-modal" class="modal" hidden>
+  <div class="sheet" id="count-sheet">
+    <h2>人数を数える</h2>
+    <p id="count-note" class="small muted"></p>
+    <h3>区画にいる人</h3>
+    <div class="stepper" data-for="cnt-present">
+      <button data-d="-1" aria-label="1人減らす">−</button>
+      <input id="cnt-present" type="number" inputmode="numeric" min="0" value="0">
+      <button data-d="1" aria-label="1人増やす">＋</button>
+    </div>
+    <h3>スマートフォンを見ている人</h3>
+    <div class="stepper" data-for="cnt-phone">
+      <button data-d="-1" aria-label="1人減らす">−</button>
+      <input id="cnt-phone" type="number" inputmode="numeric" min="0" value="0">
+      <button data-d="1" aria-label="1人増やす">＋</button>
+    </div>
+    <p id="count-err" class="err"></p>
+    <button id="count-save" class="big dwell">記録する</button>
+    <button id="count-skip" class="mid ghost" style="width:100%">今回は数えない</button>
+  </div>
+</div>
+
+<!-- ===================== グループの構成シート ===================== -->
+<div id="group-sheet" class="modal" hidden>
+  <div class="sheet">
+    <div class="sheet-head"><h2 id="g-title"></h2><button id="g-close" class="ghost">閉じる</button></div>
+    <h3>関係（見た目からの推定）</h3>
+    <div id="g-rel" class="grid g3"></div>
+    <h3>人数</h3>
+    <div id="g-size" class="grid g5"></div>
+    <h3>含まれる人</h3>
+    <div id="g-mem" class="grid g2"></div>
+    <p class="small muted">間違えたときは、記録画面の「取り消す」で直前の1件を取り消せます。</p>
+  </div>
+</div>
+
+<div id="toast" hidden><span></span><button></button></div>
+
+<script>
+'use strict';
+/* =========================================================
+   保存のしくみ
+   - 観察1回ぶんを1つのキー（vobs:obs:観察ID）に丸ごと保存する
+   - 記録は「追記だけ」。取り消しは行を消さず voided=true にする
+   - 画面の状態（計測中のグループなど）は、記録から毎回計算し直す
+   ========================================================= */
+const K_OBS = 'vobs:obs:', K_PLAN = 'vobs:plan', K_CUR = 'vobs:current', K_EXP = 'vobs:lastExport';
+const $ = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+
+let plan = null, obs = null, tab = 'dwell', pair = null, groupTarget = null;
+let audioCtx = null, wakeLock = null, desire = null, saveOk = true;
+
+const REL = {solo:'一人', couple:'恋人', friends:'友人', family:'家族', tour:'団体', unknown:'不明'};
+const MEM = {child:'子ども', elder:'高齢者'};
+const SIZES = [[1,'1'],[2,'2'],[3,'3'],[4,'4'],[5,'5+']];
+// 取り消しの対象にしない出来事（自動で入るもの、区切り、ふりかえり）
+const NO_UNDO = new Set(['session_start','session_end','count_prompt','self_est_min','self_desire','self_comment']);
+
+/* ---------- 時刻 ---------- */
+function pad(n, w = 2){ return String(n).padStart(w, '0'); }
+function fmtLocal(t){
+  const d = new Date(t), off = -d.getTimezoneOffset(), a = Math.abs(off);
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}.${pad(d.getMilliseconds(),3)}${off>=0?'+':'-'}${pad(Math.floor(a/60))}:${pad(a%60)}`;
+}
+function stamp(t = Date.now()){
+  const d = new Date(t);
+  return `${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
+}
+function esc(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+/* ---------- 端末への保存 ---------- */
+function readJSON(k){ try{ const v = localStorage.getItem(k); return v ? JSON.parse(v) : null; }catch(e){ return null; } }
+function writeJSON(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); return true; }catch(e){ return false; } }
+function saveObs(){
+  saveOk = writeJSON(K_OBS + obs.observation_id, obs);
+  if(!saveOk) toast('保存できませんでした。すぐにCSVを書き出してください。');
+  return saveOk;
+}
+function listObs(){
+  const out = [];
+  for(let i = 0; i < localStorage.length; i++){
+    const k = localStorage.key(i);
+    if(k && k.startsWith(K_OBS)){ const o = readJSON(k); if(o) out.push(o); }
+  }
+  return out.sort((a, b) => a.started_ms - b.started_ms);
+}
+
+/* ---------- 記録の追加（すべての記録はここを通る） ---------- */
+function addEvent(type, o = {}){
+  const ev = {
+    event_id: obs.events.length + 1,
+    event_type: type,
+    unit_id: o.unit ?? null,
+    t: Date.now(),
+    value_num: o.num ?? null,
+    value_text: o.text ?? null,
+    voided: false
+  };
+  if(o.replaces) ev.replaces = o.replaces; // 構成を付け直したとき、前の値の event_id
+  if(o.auto) ev.auto = true;               // 自動で入った記録（取り消しの対象外）
+  obs.events.push(ev);
+  saveObs();
+  return ev;
+}
+// 連番：観察の中で通し。取り消した番号も使い回さない
+function nextUnit(){ return Math.max(0, ...obs.events.map(e => e.unit_id || 0)) + 1; }
+
+/* ---------- 記録から今の状態を計算する ---------- */
+function derive(){
+  const dwell = new Map(), speed = new Map(), tags = new Map(), pass = [];
+  for(const e of obs.events){
+    if(e.voided) continue;
+    switch(e.event_type){
+      case 'dwell_enter': dwell.set(e.unit_id, e); break;
+      case 'dwell_exit':  dwell.delete(e.unit_id); break;
+      case 'speed_line1': speed.set(e.unit_id, e); break;
+      case 'speed_line2': speed.delete(e.unit_id); break;
+      case 'passby': pass.push(e); break;
+      case 'group_size': case 'group_rel': case 'group_member': {
+        const t = tags.get(e.unit_id) || {size:null, rel:null, mem:new Map()};
+        if(e.event_type === 'group_size') t.size = e;
+        else if(e.event_type === 'group_rel') t.rel = e;
+        else t.mem.set(e.value_text, e);
+        tags.set(e.unit_id, t);
+        break;
+      }
+    }
+  }
+  return {dwell, speed, tags, pass: pass.slice(-8).reverse()};
+}
+function tagSummary(t){
+  if(!t) return '';
+  const p = [];
+  if(t.rel) p.push(REL[t.rel.value_text]);
+  if(t.size) p.push(`${t.size.value_text || t.size.value_num}人`);
+  for(const k of t.mem.keys()) p.push(MEM[k]);
+  return p.join('・');
+}
+function describe(e){
+  const u = e.unit_id ? `#${e.unit_id} ` : '';
+  switch(e.event_type){
+    case 'dwell_enter': return `${u}入った`;
+    case 'dwell_exit': return `${u}出た`;
+    case 'passby': return `${u}${e.value_text === 'stop' ? '立ち止まった' : '通過'}`;
+    case 'speed_line1': return `${u}1本目（${e.value_text}）`;
+    case 'speed_line2': return `${u}2本目（${e.value_text}）`;
+    case 'group_size': return `${u}${e.value_text || e.value_num}人`;
+    case 'group_rel': return `${u}${REL[e.value_text]}`;
+    case 'group_member': return `${u}${MEM[e.value_text]}を含む`;
+    case 'count_present': return `区画に${e.value_num}人`;
+    case 'count_phone': return `スマホを見ている人 ${e.value_num}人`;
+    case 'env_noise': return `音 ${e.value_num} dB`;
+    case 'env_light': return `照度 ${e.value_num} lux`;
+    case 'photo_mark': return `写真${e.value_text ? '：' + e.value_text : ''}`;
+    case 'sync_mark': return `時刻合わせ（${e.value_text}）`;
+    default: return e.event_type;
+  }
+}
+
+/* ---------- 取り消し ---------- */
+function undoTarget(){
+  for(let i = obs.events.length - 1; i >= 0; i--){
+    const e = obs.events[i];
+    if(!e.voided && !e.auto && !NO_UNDO.has(e.event_type)) return e;
+  }
+  return null;
+}
+function undo(){
+  const e = undoTarget();
+  if(!e) return;
+  e.voided = true;
+  if(e.replaces){ // 付け直した構成を取り消したら、前の値に戻す
+    const prev = obs.events.find(x => x.event_id === e.replaces);
+    if(prev) prev.voided = false;
+  }
+  saveObs();
+  toast(`取り消しました：${describe(e)}`);
+  render();
+}
+
+/* ---------- 画面の描き直し ---------- */
+function row(id, t, extra){
+  const s = tagSummary(t);
+  return `<li class="unit"><span class="num">#${id}</span>`
+       + `<button class="tagbtn${s ? ' has' : ''}" data-tag="${id}">${s ? esc(s) : '構成を付ける'}</button>${extra}</li>`;
+}
+function render(){
+  if(!obs) return;
+  const d = derive();
+  $('#rh-zone').textContent = obs.zone_label || obs.zone_id;
+  const n = obs.events.filter(e => !e.voided).length;
+  $('#rh-meta').innerHTML = `${esc(obs.facility)}　記録 ${n}件` + (saveOk ? '' : '　<span class="savebad">保存に失敗</span>');
+
+  const u = undoTarget();
+  $('#last-desc').innerHTML = u ? `<b>${esc(describe(u))}</b>` : '<span class="muted">まだ記録はありません</span>';
+  $('#undo-btn').disabled = !u;
+
+  const hasStartSync = obs.events.some(e => !e.voided && e.event_type === 'sync_mark' && e.value_text === 'start');
+  $('#sync-banner').hidden = hasStartSync || obs.sync_later;
+
+  // 滞在
+  $('#dwell-list').innerHTML = d.dwell.size
+    ? [...d.dwell.keys()].sort((a, b) => a - b)
+        .map(id => row(id, d.tags.get(id), `<button class="rowbtn dwell" data-exit="${id}">出た</button>`)).join('')
+    : '<li class="unit empty">「入った」を押すと、計測中のグループがここに並びます。</li>';
+
+  // 立ち止まり
+  $('#pass-list').innerHTML = d.pass.length
+    ? d.pass.map(e => row(e.unit_id, d.tags.get(e.unit_id),
+        `<span class="badge ${e.value_text === 'stop' ? 'stop' : 'pass'}">${e.value_text === 'stop' ? '立ち止まった' : '通過'}</span>`)).join('')
+    : '<li class="unit empty">前を通ったグループごとに、下のどちらかを押します。</li>';
+
+  // 歩く速さ
+  $('#pair-sel').hidden = obs.line_pairs.length < 2;
+  $('#pair-sel').innerHTML = obs.line_pairs.map(p => `<button data-pair="${esc(p)}" class="${p === pair ? 'sel' : ''}">${esc(p)}</button>`).join('');
+  $('#act-line1').textContent = obs.line_pairs.length < 2 ? '1本目を通った' : `1本目を通った（${pair}）`;
+  $('#speed-list').innerHTML = d.speed.size
+    ? [...d.speed.entries()].sort((a, b) => a[0] - b[0])
+        .map(([id, e]) => row(id, d.tags.get(id), `<button class="rowbtn speed" data-line2="${id}">2本目${obs.line_pairs.length > 1 ? '<br><small>' + esc(e.value_text) + '</small>' : ''}</button>`)).join('')
+    : '<li class="unit empty">1本目の線を通ったら下を押し、2本目を通ったら一覧の「2本目」を押します。</li>';
+
+  if(!$('#group-sheet').hidden) renderGroup();
+}
+function setTab(t){
+  tab = t;
+  $$('.pane').forEach(p => p.classList.toggle('on', p.dataset.pane === t));
+  $$('#actions > div').forEach(p => p.classList.toggle('on', p.dataset.act === t));
+  $$('.tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === t));
+}
+function show(id){ $$('.screen').forEach(s => s.classList.toggle('on', s.id === id)); }
+
+/* ---------- 押した手応え ---------- */
+let lastTap = 0;
+function guard(btn){
+  const now = performance.now();
+  if(now - lastTap < 150) return false; // 指が触れた拍子の二重押しを防ぐ
+  lastTap = now;
+  btn.classList.add('hit');
+  setTimeout(() => btn.classList.remove('hit'), 140);
+  return true;
+}
+
+/* ---------- 現場の操作 ---------- */
+$('#act-enter').addEventListener('click', ev => {
+  if(!guard(ev.currentTarget)) return;
+  const id = nextUnit();
+  addEvent('dwell_enter', {unit:id});
+  render();
+  toast(`#${id} 入った`, '構成を付ける', () => openGroup(id));
+});
+['pass', 'stop'].forEach(kind => {
+  $('#act-' + kind).addEventListener('click', ev => {
+    if(!guard(ev.currentTarget)) return;
+    const id = nextUnit();
+    addEvent('passby', {unit:id, text:kind});
+    render();
+    toast(`#${id} ${kind === 'stop' ? '立ち止まった' : '通過'}`, '構成を付ける', () => openGroup(id));
+  });
+});
+$('#act-line1').addEventListener('click', ev => {
+  if(!guard(ev.currentTarget)) return;
+  const id = nextUnit();
+  addEvent('speed_line1', {unit:id, text:pair});
+  render();
+  toast(`#${id} 1本目`, '構成を付ける', () => openGroup(id));
+});
+$('#panes').addEventListener('click', ev => {
+  const b = ev.target.closest('button');
+  if(!b) return;
+  if(b.dataset.exit){
+    if(!guard(b)) return;
+    const id = +b.dataset.exit;
+    addEvent('dwell_exit', {unit:id}); render(); toast(`#${id} 出た`);
+  }else if(b.dataset.line2){
+    if(!guard(b)) return;
+    const id = +b.dataset.line2;
+    const first = derive().speed.get(id);
+    addEvent('speed_line2', {unit:id, text:first ? first.value_text : pair}); render(); toast(`#${id} 2本目`);
+  }else if(b.dataset.tag){
+    openGroup(+b.dataset.tag);
+  }else if(b.dataset.pair){
+    pair = b.dataset.pair; render();
+  }
+});
+$$('.tabs button').forEach(b => b.addEventListener('click', () => setTab(b.dataset.tab)));
+$('#undo-btn').addEventListener('click', undo);
+
+/* ---------- 時刻合わせ ---------- */
+function sync(text){
+  addEvent('sync_mark', {text});
+  render();
+  toast(`時刻合わせ（${text}）を記録しました`);
+}
+$('#sync-start').addEventListener('click', () => sync('start'));
+$('#sync-later').addEventListener('click', () => { obs.sync_later = true; saveObs(); render(); });
+$('#sync-extra').addEventListener('click', () => {
+  const hasStart = obs.events.some(e => !e.voided && e.event_type === 'sync_mark' && e.value_text === 'start');
+  sync(hasStart ? 'extra' : 'start');
+});
+
+/* ---------- 環境の値・写真 ---------- */
+function saveNumber(inputSel, type, unitLabel){
+  const v = $(inputSel).value.trim();
+  const n = Number(v);
+  if(v === '' || !Number.isFinite(n) || n < 0){ toast(`${unitLabel}の値を数字で入れてください`); return; }
+  addEvent(type, {num:n});
+  $(inputSel).value = '';
+  render();
+  toast(`記録しました：${describe(obs.events[obs.events.length - 1])}`);
+}
+$('#noise-save').addEventListener('click', () => saveNumber('#noise-input', 'env_noise', '音の大きさ'));
+$('#light-save').addEventListener('click', () => saveNumber('#light-input', 'env_light', '照度'));
+$('#photo-save').addEventListener('click', () => {
+  const memo = $('#photo-input').value.trim();
+  addEvent('photo_mark', {text: memo || null});
+  $('#photo-input').value = '';
+  render();
+  toast('写真を撮った時刻を記録しました');
+});
+
+/* ---------- グループの構成 ---------- */
+function openGroup(id){ groupTarget = id; $('#group-sheet').hidden = false; renderGroup(); }
+function renderGroup(){
+  const t = derive().tags.get(groupTarget) || {size:null, rel:null, mem:new Map()};
+  $('#g-title').textContent = `#${groupTarget} の構成`;
+  $('#g-rel').innerHTML = Object.entries(REL).map(([k, v]) =>
+    `<button class="choice${t.rel && t.rel.value_text === k ? ' sel' : ''}" data-rel="${k}">${v}</button>`).join('');
+  $('#g-size').innerHTML = SIZES.map(([n, l]) =>
+    `<button class="choice${t.size && t.size.value_num === n ? ' sel' : ''}" data-size="${n}">${l}</button>`).join('');
+  $('#g-mem').innerHTML = Object.entries(MEM).map(([k, v]) =>
+    `<button class="choice${t.mem.has(k) ? ' sel' : ''}" data-mem="${k}">${v}</button>`).join('');
+}
+// 関係と人数は1つだけ。付け直すと前の値を voided にして、新しい値を足す
+function setTag(type, num, text){
+  const cur = obs.events.filter(e => !e.voided && e.event_type === type && e.unit_id === groupTarget
+                                     && (type !== 'group_member' || e.value_text === text));
+  const prev = cur[cur.length - 1];
+  if(type === 'group_member' && prev){ toast('すでに付いています。外すときは「取り消す」を使います'); return; }
+  if(prev && prev.value_num === num && prev.value_text === text) return;
+  if(prev) prev.voided = true;
+  addEvent(type, {unit:groupTarget, num, text, replaces: prev ? prev.event_id : null});
+  render();
+}
+$('#group-sheet').addEventListener('click', ev => {
+  if(ev.target === ev.currentTarget){ $('#group-sheet').hidden = true; return; }
+  const b = ev.target.closest('button');
+  if(!b) return;
+  if(b.id === 'g-close') $('#group-sheet').hidden = true;
+  else if(b.dataset.rel) setTag('group_rel', null, b.dataset.rel);
+  else if(b.dataset.size){ const n = +b.dataset.size; setTag('group_size', n, n === 5 ? '5+' : null); }
+  else if(b.dataset.mem) setTag('group_member', null, b.dataset.mem);
+});
+
+/* ---------- 人数を数える ---------- */
+function openCount(auto){
+  $('#cnt-present').value = 0;
+  $('#cnt-phone').value = 0;
+  $('#count-err').textContent = '';
+  $('#count-note').textContent = auto
+    ? `${obs.count_interval_min}分ごとの数え上げです。今、区画にいる人数を入れてください。`
+    : '今、区画にいる人数を入れてください。';
+  $('#count-modal').hidden = false;
+  const s = $('#count-sheet');
+  s.classList.remove('alert-ring'); void s.offsetWidth; if(auto) s.classList.add('alert-ring');
+}
+$$('.stepper').forEach(st => st.addEventListener('click', ev => {
+  const b = ev.target.closest('button');
+  if(!b) return;
+  const inp = $('#' + st.dataset.for);
+  inp.value = Math.max(0, (parseInt(inp.value, 10) || 0) + Number(b.dataset.d));
+}));
+$('#count-save').addEventListener('click', () => {
+  const p = Number($('#cnt-present').value), ph = Number($('#cnt-phone').value);
+  if(!Number.isInteger(p) || !Number.isInteger(ph) || p < 0 || ph < 0){ $('#count-err').textContent = '人数は0以上の整数で入れてください。'; return; }
+  if(ph > p){ $('#count-err').textContent = 'スマートフォンを見ている人が、区画にいる人より多くなっています。'; return; }
+  addEvent('count_present', {num:p});
+  addEvent('count_phone', {num:ph});
+  $('#count-modal').hidden = true;
+  render();
+  toast(`記録しました：区画に${p}人、スマホを見ている人 ${ph}人`);
+});
+$('#count-skip').addEventListener('click', () => { $('#count-modal').hidden = true; });
+$('#count-now').addEventListener('click', () => openCount(false));
+
+// 1秒ごとに、数え上げの時刻が来たかを確かめる
+function tick(){
+  if(!obs || obs.ended_ms || !$('#count-modal').hidden) return;
+  const now = Date.now();
+  if(now < obs.next_count_ms) return;
+  const iv = obs.count_interval_min * 60000;
+  while(obs.next_count_ms <= now) obs.next_count_ms += iv; // 画面が消えていて逃した回はまとめて1回にする
+  addEvent('count_prompt', {auto:true});
+  openCount(true);
+  beep();
+}
+setInterval(tick, 1000);
+
+/* ---------- 音と画面の点灯 ---------- */
+function initAudio(){
+  try{
+    if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if(audioCtx.state === 'suspended') audioCtx.resume();
+  }catch(e){}
+}
+document.addEventListener('pointerdown', initAudio, {once:true});
+function beep(){
+  try{
+    if(!audioCtx) return;
+    const t0 = audioCtx.currentTime, o = audioCtx.createOscillator(), g = audioCtx.createGain();
+    o.frequency.value = 880;
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(0.25, t0 + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.5);
+    o.connect(g).connect(audioCtx.destination);
+    o.start(t0); o.stop(t0 + 0.55);
+  }catch(e){}
+}
+async function keepAwake(){
+  try{ if('wakeLock' in navigator && document.visibilityState === 'visible') wakeLock = await navigator.wakeLock.request('screen'); }catch(e){}
+}
+document.addEventListener('visibilitychange', () => {
+  if(document.visibilityState === 'visible' && obs && !obs.ended_ms){ keepAwake(); tick(); render(); }
+});
+
+/* ---------- 観察の開始 ---------- */
+function startObs(){
+  let facility, zone_id, zone_label;
+  if(plan){
+    const z = plan.zones.find(z => z.zone_id === $('#zone-select').value);
+    if(!z){ $('#start-err').textContent = '区画を選んでください。'; return; }
+    facility = (plan.facility && plan.facility.name) || '';
+    zone_id = z.zone_id; zone_label = z.name || z.zone_id;
+  }else{
+    facility = $('#facility-input').value.trim();
+    zone_id = $('#zone-input').value.trim(); zone_label = zone_id;
+    if(!facility || !zone_id){ $('#start-err').textContent = '施設の名前と区画を入れてください。'; return; }
+  }
+  const lines = $('#lines-input').value.split(/[,、]/).map(s => s.trim()).filter(Boolean);
+  const iv = Number($('#interval-input').value);
+  if(!Number.isFinite(iv) || iv <= 0){ $('#start-err').textContent = '数える間隔は1以上の数字で入れてください。'; return; }
+  $('#start-err').textContent = '';
+  const t = Date.now();
+  obs = {
+    observation_id: 'O' + stamp(t),
+    plan_id: plan ? (plan.plan_id || 'unnamed-plan') : 'manual',
+    facility, zone_id, zone_label,
+    line_pairs: lines.length ? lines : ['L01'],
+    count_interval_min: iv,
+    started_ms: t, ended_ms: null, closed: false,
+    next_count_ms: t + iv * 60000,
+    sync_later: false,
+    events: []
+  };
+  addEvent('session_start');
+  localStorage.setItem(K_CUR, obs.observation_id);
+  if(!plan){ localStorage.setItem('vobs:lastFacility', facility); }
+  pair = obs.line_pairs[0];
+  initAudio(); keepAwake();
+  if(navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
+  show('rec'); setTab('dwell'); render();
+}
+$('#start-btn').addEventListener('click', startObs);
+
+/* ---------- 観察の終了とふりかえり ---------- */
+$('#end-btn').addEventListener('click', () => {
+  const d = derive();
+  let msg = '観察を終えますか。';
+  if(d.dwell.size || d.speed.size)
+    msg += `\n\n計測中のグループが残っています（滞在 ${d.dwell.size}組、歩く速さ ${d.speed.size}組）。このまま終えると、それらの「出た」「2本目」は記録されません。`;
+  if(!confirm(msg)) return;
+  addEvent('session_end');
+  obs.ended_ms = Date.now();
+  saveObs();
+  openEnd();
+});
+function openEnd(){
+  desire = null;
+  $('#self-est').value = ''; $('#self-comment').value = '';
+  const ended = obs.events.some(e => e.event_type === 'sync_mark' && !e.voided && e.value_text === 'end');
+  $('#sync-end').disabled = ended;
+  $('#sync-end-done').textContent = ended ? '記録しました。' : '';
+  $('#desire').innerHTML = Array.from({length:11}, (_, i) => `<button data-v="${i}">${i}</button>`).join('');
+  show('end');
+}
+$('#sync-end').addEventListener('click', () => {
+  addEvent('sync_mark', {text:'end'});
+  $('#sync-end').disabled = true;
+  $('#sync-end-done').textContent = '記録しました。';
+});
+$('#desire').addEventListener('click', ev => {
+  const b = ev.target.closest('button');
+  if(!b) return;
+  desire = +b.dataset.v;
+  $$('#desire button').forEach(x => x.classList.toggle('sel', x === b));
+});
+$('#finish-btn').addEventListener('click', () => {
+  const est = $('#self-est').value.trim(), com = $('#self-comment').value.trim();
+  if(est !== ''){
+    const n = Number(est);
+    if(!Number.isFinite(n) || n < 0){ toast('分は0以上の数字で入れてください'); return; }
+    addEvent('self_est_min', {num:n});
+  }
+  if(desire !== null) addEvent('self_desire', {num:desire});
+  if(com) addEvent('self_comment', {text:com});
+  obs.closed = true;
+  saveObs();
+  localStorage.removeItem(K_CUR);
+  try{ if(wakeLock) wakeLock.release(); }catch(e){}
+  obs = null;
+  showHome();
+  toast('保存しました。区切りのよいところでCSVを書き出してください');
+});
+
+/* ---------- 計画JSON ---------- */
+$('#plan-file').addEventListener('change', async ev => {
+  const f = ev.target.files[0];
+  ev.target.value = '';
+  if(!f) return;
+  try{
+    const p = JSON.parse(await f.text());
+    if(!Array.isArray(p.zones) || !p.zones.length) throw new Error('zones');
+    if(p.map) delete p.map.image; // 館内図の画像は記録画面では使わないので、端末の保存容量を空けておく
+    plan = p;
+    if(!writeJSON(K_PLAN, p)) toast('計画を端末に保存できませんでした');
+    renderHome();
+    toast(`計画「${p.plan_id || f.name}」を読み込みました`);
+  }catch(e){
+    toast('計画JSONを読めませんでした。zones（区画の一覧）が入っているか確かめてください');
+  }
+});
+$('#plan-clear').addEventListener('click', () => { plan = null; localStorage.removeItem(K_PLAN); renderHome(); });
+$('#zone-select').addEventListener('change', fillLinesFromPlan);
+function fillLinesFromPlan(){
+  if(!plan) return;
+  const zid = $('#zone-select').value;
+  const ls = (plan.speed_lines || []).filter(l => l.zone_id === zid).map(l => l.line_pair_id);
+  $('#lines-input').value = ls.length ? ls.join(', ') : 'L01';
+}
+
+/* ---------- 書き出し ---------- */
+const CSV_COLS = ['observation_id','plan_id','facility','zone_id','event_id','event_type','unit_id','t_epoch_ms','t_local','value_num','value_text','voided'];
+function cell(v){ const s = String(v); return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }
+function buildCSV(){
+  const out = [CSV_COLS.join(',')];
+  for(const o of listObs()){
+    for(const e of o.events){
+      out.push([o.observation_id, o.plan_id, o.facility, o.zone_id, e.event_id, e.event_type,
+                e.unit_id ?? '', e.t, fmtLocal(e.t), e.value_num ?? '', e.value_text ?? '', e.voided ? 1 : 0]
+               .map(cell).join(','));
+    }
+  }
+  // 先頭のBOMは、Excelで開いたときの文字化けを防ぐため
+  return '\uFEFF' + out.join('\r\n') + '\r\n';
+}
+function csvFile(){ return new File([buildCSV()], `vobs_${stamp()}.csv`, {type:'text/csv'}); }
+function markExported(){ localStorage.setItem(K_EXP, String(Date.now())); renderHome(); }
+$('#export-dl').addEventListener('click', () => {
+  const f = csvFile(), url = URL.createObjectURL(f), a = document.createElement('a');
+  a.href = url; a.download = f.name; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+  markExported();
+});
+$('#export-share').addEventListener('click', async () => {
+  try{ await navigator.share({files:[csvFile()]}); markExported(); }catch(e){}
+});
+
+/* ---------- 開始画面 ---------- */
+function renderHome(){
+  $('#plan-status').textContent = plan
+    ? `計画「${plan.plan_id || '名前なし'}」（${(plan.facility && plan.facility.name) || '施設名なし'}、区画 ${plan.zones.length}個）を使います。`
+    : '計画を読み込まずに、施設と区画を手で入れて始めることもできます。';
+  $('#plan-clear').hidden = !plan;
+  $('#plan-fields').hidden = !plan;
+  $('#manual-fields').hidden = !!plan;
+  if(plan){
+    const prev = $('#zone-select').value;
+    $('#zone-select').innerHTML = plan.zones.map(z => `<option value="${esc(z.zone_id)}">${esc(z.name || z.zone_id)}</option>`).join('');
+    if(prev && plan.zones.some(z => z.zone_id === prev)) $('#zone-select').value = prev;
+    fillLinesFromPlan();
+    if(plan.settings && plan.settings.count_interval_min) $('#interval-input').value = plan.settings.count_interval_min;
+  }else if(!$('#facility-input').value){
+    $('#facility-input').value = localStorage.getItem('vobs:lastFacility') || '';
+  }
+
+  const all = listObs();
+  const last = Number(localStorage.getItem(K_EXP) || 0);
+  const pending = all.reduce((s, o) => s + o.events.filter(e => e.t > last).length, 0);
+  const total = all.reduce((s, o) => s + o.events.length, 0);
+  $('#export-status').innerHTML = !total ? '<span class="muted">まだ記録はありません。</span>'
+    : pending ? `<span class="savebad">書き出していない記録が ${pending}件 あります。</span>`
+    : '<span class="muted">すべての記録を書き出し済みです。</span>';
+  $('#obs-list').innerHTML = all.length
+    ? all.slice().reverse().map(o =>
+        `<li style="display:flex;align-items:center;gap:10px"><div style="flex:1"><b>${esc(o.facility)}／${esc(o.zone_label || o.zone_id)}</b><br>`
+        + `<span class="muted">${esc(o.observation_id)}　記録 ${o.events.filter(e => !e.voided).length}件${o.closed ? '' : '　途中'}</span></div>`
+        + `<button class="ghost" style="color:var(--danger)" data-del="${esc(o.observation_id)}">削除</button></li>`).join('')
+    : '<li class="muted">まだありません。</li>';
+
+  try{
+    const test = new File(['x'], 't.csv', {type:'text/csv'});
+    $('#export-share').hidden = !(navigator.canShare && navigator.canShare({files:[test]}));
+  }catch(e){ $('#export-share').hidden = true; }
+}
+function showHome(){ renderHome(); show('home'); }
+
+// 練習の記録などを消す。端末から完全に消えるので、確認を2つ重ねる
+$('#obs-list').addEventListener('click', ev => {
+  const b = ev.target.closest('button[data-del]');
+  if(!b) return;
+  const o = readJSON(K_OBS + b.dataset.del);
+  if(!o) return;
+  const last = Number(localStorage.getItem(K_EXP) || 0);
+  const unexported = o.events.some(e => e.t > last);
+  let msg = `「${o.facility}／${o.zone_label || o.zone_id}」（${o.observation_id}）の記録を、この端末から削除します。元に戻せません。`;
+  if(unexported) msg += '\n\nこの観察には、まだCSVに書き出していない記録があります。';
+  if(!confirm(msg)) return;
+  if(unexported && !confirm('書き出していない記録も含めて、本当に削除しますか。')) return;
+  localStorage.removeItem(K_OBS + o.observation_id);
+  if(localStorage.getItem(K_CUR) === o.observation_id) localStorage.removeItem(K_CUR);
+  renderHome();
+  toast('削除しました');
+});
+
+/* ---------- お知らせ ---------- */
+let toastTimer = null;
+function toast(msg, actLabel, act){
+  const t = $('#toast'), b = t.querySelector('button');
+  t.querySelector('span').textContent = msg;
+  if(actLabel){ b.hidden = false; b.textContent = actLabel; b.onclick = () => { t.hidden = true; act(); }; }
+  else b.hidden = true;
+  // 記録画面では、大きなボタンのすぐ上に出す
+  if($('#rec').classList.contains('on')){
+    const top = $('#actions').getBoundingClientRect().top;
+    t.style.bottom = (window.innerHeight - top + 10) + 'px';
+  }else{
+    t.style.bottom = 'calc(env(safe-area-inset-bottom) + 16px)';
+  }
+  t.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { t.hidden = true; }, actLabel ? 4000 : 2400);
+}
+
+/* ---------- 起動：途中の観察があれば、そこから再開する ---------- */
+(function init(){
+  plan = readJSON(K_PLAN);
+  const cur = localStorage.getItem(K_CUR);
+  const o = cur ? readJSON(K_OBS + cur) : null;
+  if(o && !o.closed){
+    obs = o; pair = o.line_pairs[0];
+    if(o.ended_ms){ openEnd(); }
+    else{ show('rec'); setTab('dwell'); render(); keepAwake(); tick(); }
+    toast('前回の観察の続きから再開しました');
+    return;
+  }
+  showHome();
+})();
+</script>
+</body>
+</html>
