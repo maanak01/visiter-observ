@@ -2,7 +2,7 @@
 // 方針は「ネットワーク優先」：電波があれば最新のページを取りに行き、ついでに端末に控えを保存する。
 // 電波がない（または3秒以内に返事がない）ときは、端末の控えを表示する。
 // 記録データは扱わない（記録は各ページが端末に保存している）。
-const CACHE = 'vobs-pages-v1';
+const CACHE = 'vobs-pages-v2';
 const PAGES = ['./kiroku_index.html', './keikaku.html'];
 
 self.addEventListener('install', e => {
