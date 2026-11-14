@@ -155,6 +155,24 @@ label > input, label > select, label > textarea{margin-top:4px;color:var(--ink)}
 .mz.cur{fill:var(--dwell);fill-opacity:.22;stroke:var(--dwell);stroke-width:3.5}
 .ml{stroke:var(--speed);stroke-width:4;vector-effect:non-scaling-stroke}
 .mlbl{fill:var(--ink);stroke:var(--surface);paint-order:stroke;font-weight:700}
+/* ===== 観察の種類と観察点（開始画面） ===== */
+.modesel{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px}
+.modesel button{min-height:56px;border:1.5px solid var(--line);border-radius:14px;font-size:18px;font-weight:700}
+.modesel button.sel{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.pickmap{position:relative;height:42vh;margin-top:6px;border-radius:12px;overflow:hidden;background:var(--stage);border:1px solid var(--line)}
+.pickmap svg{width:100%;height:100%;display:block}
+.pickwhole{position:absolute;right:8px;top:8px;background:var(--surface);min-height:36px;padding:2px 12px}
+.pointlist{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.pointlist .pt{display:inline-flex;align-items:center;gap:4px}
+.pointlist .pt-btn{border:1.5px solid var(--line);border-radius:12px;min-height:44px;padding:4px 12px;font-weight:600}
+.pointlist .pt-btn.sel{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.pointlist .pt-del{font-size:13px;color:var(--danger);border:1px solid var(--line);border-radius:8px;padding:0 8px;min-height:36px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.row2btn{display:grid;grid-template-columns:2fr 1fr;gap:10px}
+.mpt{fill:var(--ink);stroke:var(--surface);stroke-width:3;vector-effect:non-scaling-stroke}
+.mpt.sel{fill:var(--stop)}
+.mpt.new{fill:none;stroke:var(--danger);stroke-width:3;stroke-dasharray:4 3}
+.walkstat{font-size:18px;font-weight:700;padding:6px 0 10px}
 #map-btn.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
 #toast{position:fixed;left:12px;right:12px;max-width:616px;margin:0 auto;z-index:30;
   background:var(--ink);color:var(--bg);border-radius:14px;padding:10px 12px 10px 16px;
@@ -179,17 +197,47 @@ label > input, label > select, label > textarea{margin-top:4px;color:var(--ink)}
         <button id="plan-clear" class="ghost" hidden>計画を外す</button>
       </div>
 
+      <h3>観察の種類</h3>
+      <div id="mode-sel" class="modesel">
+        <button data-mode="fixed">定点観察</button>
+        <button data-mode="walk">体験</button>
+      </div>
+      <p id="mode-note" class="small muted"></p>
+
       <div id="plan-fields" hidden>
         <label>区画<select id="zone-select"></select></label>
+        <label id="zone-extra-wrap" hidden>計画にない区画の名前<input id="zone-extra" autocomplete="off"></label>
       </div>
       <div id="manual-fields">
         <label>施設の名前<input id="facility-input" autocomplete="off"></label>
         <label>区画の名前またはID<input id="zone-input" autocomplete="off"></label>
       </div>
-      <label>歩く速さの線の組（複数あればカンマ区切り）<input id="lines-input" value="L01" autocomplete="off"></label>
-      <label>人数を数える間隔（分）<input id="interval-input" type="number" inputmode="numeric" min="1" value="5"></label>
+
+      <div id="fixed-fields">
+        <h3>観察点</h3>
+        <div id="pick-map" class="pickmap" hidden>
+          <svg id="pick-svg" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet"></svg>
+          <button id="pick-whole" class="pickwhole ghost">全体</button>
+        </div>
+        <p id="pick-hint" class="small muted"></p>
+        <div id="point-list" class="pointlist"></div>
+        <div id="point-new" class="block" style="margin:10px 0" hidden>
+          <label style="margin-top:0">新しい観察点の名前<input id="point-new-name" autocomplete="off"></label>
+          <div class="row2btn"><button id="point-new-ok" class="mid dwell">ここに置く</button><button id="point-new-cancel" class="mid ghost">やめる</button></div>
+        </div>
+        <label id="point-manual-wrap">観察点の名前<input id="point-manual" autocomplete="off" placeholder="例：入口横のベンチ"></label>
+        <label>歩く速さの線の組（複数あればカンマ区切り）<input id="lines-input" value="L01" autocomplete="off"></label>
+        <div class="row2">
+          <label>数える間隔の最短（分）<input id="interval-lo" type="number" inputmode="decimal" min="0.5" step="0.5" value="4"></label>
+          <label>最長（分）<input id="interval-hi" type="number" inputmode="decimal" min="0.5" step="0.5" value="6"></label>
+        </div>
+      </div>
       <p id="start-err" class="err"></p>
       <button id="start-btn" class="big dwell">観察を始める</button>
+      <div id="plan-out" hidden>
+        <p id="plan-out-note" class="small" style="margin-top:14px"></p>
+        <button id="plan-export" class="mid other">計画JSONを書き出す</button>
+      </div>
     </div>
 
     <div class="block">
@@ -243,7 +291,8 @@ label > input, label > select, label > textarea{margin-top:4px;color:var(--ink)}
       <ul id="speed-list" class="units"></ul>
     </div>
     <div class="pane" data-pane="other">
-      <div class="section">
+      <div id="walk-status" class="walkstat" hidden></div>
+      <div class="section" id="count-sec">
         <button id="count-now" class="mid other" style="margin-top:0">今の人数を数える</button>
       </div>
       <div class="section">
@@ -276,8 +325,9 @@ label > input, label > select, label > textarea{margin-top:4px;color:var(--ink)}
       <button id="act-stop" class="big stop">立ち止まった</button>
     </div>
     <div data-act="speed"><button id="act-line1" class="big speed">1本目を通った</button></div>
+    <div data-act="walk"><button id="act-self" class="big dwell">区画に入った</button></div>
   </div>
-  <nav class="tabs">
+  <nav class="tabs" id="tabs">
     <button data-tab="dwell">滞在</button>
     <button data-tab="pass">立ち止まり</button>
     <button data-tab="speed">歩く速さ</button>
@@ -486,6 +536,8 @@ function describe(e){
     case 'env_light': return `照度 ${e.value_num} lux`;
     case 'photo_mark': return `写真${e.value_text ? '：' + e.value_text : ''}`;
     case 'sync_mark': return `時刻合わせ（${e.value_text}）`;
+    case 'self_enter': return '区画に入った（自分）';
+    case 'self_exit': return '区画を出た（自分）';
     default: return e.event_type;
   }
 }
@@ -536,7 +588,17 @@ function render(){
   const d = derive();
   $('#rh-zone').textContent = obs.zone_label || obs.zone_id;
   const n = obs.events.filter(e => !e.voided).length;
-  $('#rh-meta').innerHTML = `${esc(obs.facility)}　記録 ${n}件` + (saveOk ? '' : '　<span class="savebad">保存に失敗</span>');
+  const modeTxt = obs.mode === 'walk' ? '体験' : obs.mode === 'fixed' ? `定点：${obs.point ? obs.point.name : ''}` : '';
+  $('#rh-meta').innerHTML = `${esc(obs.facility)}${modeTxt ? '　' + esc(modeTxt) : ''}　記録 ${n}件` + (saveOk ? '' : '　<span class="savebad">保存に失敗</span>');
+
+  if(obs.mode === 'walk'){ // 体験：大きなボタン1つを「入った → 出た → ふりかえりへ」と切り替える
+    const st = selfState();
+    $('#walk-status').textContent = st === 'before' ? 'まだ区画に入っていません。入ったら下のボタンを押します。'
+      : st === 'in' ? '区画の中にいます。出たら下のボタンを押します。' : '区画を出ました。ふりかえりに進みます。';
+    const b = $('#act-self');
+    b.textContent = st === 'before' ? '区画に入った' : st === 'in' ? '区画を出た' : 'ふりかえりへ';
+    b.className = 'big ' + (st === 'in' ? 'stop' : 'dwell');
+  }
 
   const u = undoTarget();
   $('#last-desc').innerHTML = u ? `<b>${esc(actionText(u))}</b>` : '<span class="muted">まだ記録はありません</span>';
@@ -568,9 +630,16 @@ function render(){
 
   if(!$('#group-sheet').hidden) renderGroup();
 }
+// 体験の観察では、他者を記録するタブを出さない（同じ観察の中で2種類を混ぜないため）。
+// 「その他」の欄（環境の値・写真・時刻合わせ）と、出入りのボタンだけを出す
 function setTab(t){
+  if(obs && obs.mode === 'walk') t = 'walk';
   tab = t;
-  $$('.pane').forEach(p => p.classList.toggle('on', p.dataset.pane === t));
+  const pane = t === 'walk' ? 'other' : t;
+  $('#tabs').hidden = t === 'walk';
+  $('#count-sec').hidden = t === 'walk';
+  $('#walk-status').hidden = t !== 'walk';
+  $$('.pane').forEach(p => p.classList.toggle('on', p.dataset.pane === pane));
   $$('#actions > div').forEach(p => p.classList.toggle('on', p.dataset.act === t));
   $$('.tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === t));
 }
@@ -631,6 +700,21 @@ $('#panes').addEventListener('click', ev => {
 });
 $$('.tabs button').forEach(b => b.addEventListener('click', () => setTab(b.dataset.tab)));
 $('#undo-btn').addEventListener('click', undo);
+
+/* ---------- 体験：自分の出入り ---------- */
+function selfState(){
+  const live = obs.events.filter(e => !e.voided);
+  if(live.some(e => e.event_type === 'self_exit')) return 'out';
+  if(live.some(e => e.event_type === 'self_enter')) return 'in';
+  return 'before';
+}
+$('#act-self').addEventListener('click', ev => {
+  if(!guard(ev.currentTarget)) return;
+  const st = selfState();
+  if(st === 'before'){ addEvent('self_enter'); render(); toast('区画に入った時刻を記録しました'); }
+  else if(st === 'in'){ addEvent('self_exit'); render(); toast('区画を出た時刻を記録しました'); }
+  else endObservation(true);
+});
 
 /* ---------- 時刻合わせ ---------- */
 function sync(text){
@@ -711,7 +795,7 @@ function openCount(auto){
   $('#cnt-phone').value = 0;
   $('#count-err').textContent = '';
   $('#count-note').textContent = auto
-    ? `${obs.count_interval_min}分ごとの数え上げです。今、区画にいる人数を入れてください。`
+    ? '数え上げの時間です。今、区画にいる人数を入れてください。'
     : '今、区画にいる人数を入れてください。';
   $('#count-modal').hidden = false;
   const s = $('#count-sheet');
@@ -736,14 +820,21 @@ $('#count-save').addEventListener('click', () => {
 $('#count-skip').addEventListener('click', () => { $('#count-modal').hidden = true; });
 $('#count-now').addEventListener('click', () => openCount(false));
 
+// 次の知らせまでの分数を、最短〜最長の間でランダムに決める（知らせの回数から経過時間を推測しにくくするため）。
+// 以前の観察（count_interval_min だけを持つ）は、最短＝最長＝その値として、これまで通り一定の間隔になる
+function gapMin(o){
+  const lo = o.count_lo ?? o.count_interval_min ?? 4, hi = o.count_hi ?? o.count_interval_min ?? 6;
+  return Math.round((lo + Math.random() * (hi - lo)) * 100) / 100;
+}
+function schedule(o, from){ o.next_gap_min = gapMin(o); o.next_count_ms = from + o.next_gap_min * 60000; }
 // 1秒ごとに、数え上げの時刻が来たかを確かめる
 function tick(){
-  if(!obs || obs.ended_ms || !$('#count-modal').hidden) return;
+  if(!obs || obs.ended_ms || obs.mode === 'walk' || obs.next_count_ms == null || !$('#count-modal').hidden) return;
   const now = Date.now();
   if(now < obs.next_count_ms) return;
-  const iv = obs.count_interval_min * 60000;
-  while(obs.next_count_ms <= now) obs.next_count_ms += iv; // 画面が消えていて逃した回はまとめて1回にする
-  addEvent('count_prompt', {auto:true});
+  const gap = obs.next_gap_min ?? obs.count_interval_min ?? null;
+  schedule(obs, now);                              // 次の回は今から数える（画面が消えていて逃した回は1回にまとまる）
+  addEvent('count_prompt', {auto:true, num:gap});  // 今回の知らせまでに使った間隔（分）を残す
   openCount(true);
 }
 setInterval(tick, 1000);
@@ -788,7 +879,8 @@ function drawMap(){
   const pairs = g.speed_lines.filter(l => l.zone_id === obs.zone_id);
   let box = [0, 0, W, H];
   if(!mapWhole && z){ // 区画と、その区画の線が収まる範囲に、少し余白を足して映す
-    const q = [...z.polygon, ...pairs.flatMap(l => [...l.line1, ...l.line2])].map(P);
+    const q = [...z.polygon, ...pairs.flatMap(l => [...l.line1, ...l.line2]),
+               ...(obs.point && obs.point.x != null ? [[obs.point.x, obs.point.y]] : [])].map(P);
     const x0 = Math.min(...q.map(a => a[0])), x1 = Math.max(...q.map(a => a[0]));
     const y0 = Math.min(...q.map(a => a[1])), y1 = Math.max(...q.map(a => a[1]));
     const m = Math.max(x1 - x0, y1 - y0) * 0.3 + Math.max(W, H) * 0.01;
@@ -807,6 +899,11 @@ function drawMap(){
       s += `<text class="mlbl" x="${(a[0] + b[0]) / 2}" y="${(a[1] + b[1]) / 2 - fs * 0.9}" font-size="${fs}" stroke-width="${halo}" text-anchor="middle">${esc(l.line_pair_id)} ${mark}</text>`;
     }
   }
+  if(obs.point && obs.point.x != null){ // 定点観察の観察点
+    const [x, y] = P([obs.point.x, obs.point.y]);
+    s += `<circle class="mpt sel" cx="${x}" cy="${y}" r="${7 / k}"/>`;
+    s += `<text class="mlbl" x="${x}" y="${y + fs * 1.6}" font-size="${fs}" stroke-width="${halo}" text-anchor="middle">${esc(obs.point.name)}</text>`;
+  }
   svgEl.setAttribute('viewBox', box.join(' '));
   svgEl.innerHTML = s;
   $('#map-hint').textContent = !z ? 'この区画は館内図に描かれていません'
@@ -818,34 +915,48 @@ window.addEventListener('resize', drawMap);
 
 /* ---------- 観察の開始 ---------- */
 function startObs(){
+  const err = m => { $('#start-err').textContent = m; };
   let facility, zone_id, zone_label;
   if(plan){
-    const z = plan.zones.find(z => z.zone_id === $('#zone-select').value);
-    if(!z){ $('#start-err').textContent = '区画を選んでください。'; return; }
     facility = (plan.facility && plan.facility.name) || '';
-    zone_id = z.zone_id; zone_label = z.name || z.zone_id;
+    if($('#zone-select').value === '__new__'){ // 計画にない区画（イレギュラー）
+      zone_id = $('#zone-extra').value.trim(); zone_label = zone_id;
+      if(!zone_id) return err('計画にない区画の名前を入れてください。');
+    }else{
+      const z = plan.zones.find(z => z.zone_id === $('#zone-select').value);
+      if(!z) return err('区画を選んでください。');
+      zone_id = z.zone_id; zone_label = z.name || z.zone_id;
+    }
   }else{
     facility = $('#facility-input').value.trim();
     zone_id = $('#zone-input').value.trim(); zone_label = zone_id;
-    if(!facility || !zone_id){ $('#start-err').textContent = '施設の名前と区画を入れてください。'; return; }
+    if(!facility || !zone_id) return err('施設の名前と区画を入れてください。');
   }
-  const lines = $('#lines-input').value.split(/[,、]/).map(s => s.trim()).filter(Boolean);
-  const iv = Number($('#interval-input').value);
-  if(!Number.isFinite(iv) || iv <= 0){ $('#start-err').textContent = '数える間隔は1以上の数字で入れてください。'; return; }
-  $('#start-err').textContent = '';
+  let point = null, lines = ['L01'], lo = null, hi = null;
+  if(curMode === 'fixed'){
+    point = chosenPoint();
+    if(!point) return err('観察点を選んでください（地図をタップして新しく置くこともできます）。');
+    lines = $('#lines-input').value.split(/[,、]/).map(s => s.trim()).filter(Boolean);
+    lo = Number($('#interval-lo').value); hi = Number($('#interval-hi').value);
+    if(!(lo > 0) || !(hi >= lo)) return err('数える間隔は、最短を0より大きく、最長を最短以上にしてください。');
+  }
+  err('');
   const t = Date.now();
   obs = {
     observation_id: 'O' + stamp(t),
     plan_id: plan ? (plan.plan_id || 'unnamed-plan') : 'manual',
     facility, zone_id, zone_label,
+    mode: curMode,          // fixed（定点観察）か walk（体験）。観察の途中では変えない
+    point,                  // 定点観察の観察点 {point_id, name, x, y}。観察の途中では変えない
     line_pairs: lines.length ? lines : ['L01'],
     geo: planGeo(),
-    count_interval_min: iv,
+    count_lo: lo, count_hi: hi,
     started_ms: t, ended_ms: null, closed: false,
-    next_count_ms: t + iv * 60000,
+    next_count_ms: null, next_gap_min: null,
     sync_later: false,
     events: []
   };
+  if(curMode === 'fixed') schedule(obs, t);
   addEvent('session_start');
   localStorage.setItem(K_CUR, obs.observation_id);
   if(!plan){ localStorage.setItem('vobs:lastFacility', facility); }
@@ -857,17 +968,25 @@ function startObs(){
 $('#start-btn').addEventListener('click', startObs);
 
 /* ---------- 観察の終了とふりかえり ---------- */
-$('#end-btn').addEventListener('click', () => {
-  const d = derive();
+function endObservation(fromWalkButton){
   let msg = '観察を終えますか。';
-  if(d.dwell.size || d.speed.size)
-    msg += `\n\n計測中のグループが残っています（滞在 ${d.dwell.size}組、歩く速さ ${d.speed.size}組）。このまま終えると、それらの「出た」「2本目」は記録されません。`;
-  if(!confirm(msg)) return;
+  if(obs.mode === 'walk'){
+    const st = selfState();
+    if(st === 'before') msg += '\n\nまだ「区画に入った」を押していません。';
+    else if(st === 'in') msg += '\n\nまだ「区画を出た」を押していません。このまま終えると、出た時刻は記録されません。';
+    else if(fromWalkButton) msg = null; // 出たあとの「ふりかえりへ」は、確かめずに進む
+  }else{
+    const d = derive();
+    if(d.dwell.size || d.speed.size)
+      msg += `\n\n計測中のグループが残っています（滞在 ${d.dwell.size}組、歩く速さ ${d.speed.size}組）。このまま終えると、それらの「出た」「2本目」は記録されません。`;
+  }
+  if(msg && !confirm(msg)) return;
   addEvent('session_end');
   obs.ended_ms = Date.now();
   saveObs();
   openEnd();
-});
+}
+$('#end-btn').addEventListener('click', () => endObservation(false));
 function openEnd(){
   desire = null;
   $('#self-est').value = ''; $('#self-comment').value = '';
@@ -922,7 +1041,10 @@ $('#plan-file').addEventListener('change', async ev => {
       catch(e){ toast('館内図を端末に保存できませんでした。区画と線は使えます'); }
     }
     if(p.map) delete p.map.image; // 画像は IndexedDB に入れたので、localStorage には軽い情報だけを残す
+    if(!Array.isArray(p.obs_points)) p.obs_points = []; // 以前の計画には観察点がないので、空の一覧で補う
     plan = p;
+    pickedPoint = null; pendingPos = null;
+    applyPlanSettings();
     if(!writeJSON(K_PLAN, p)) toast('計画を端末に保存できませんでした');
     renderHome();
     toast(`計画「${p.plan_id || f.name}」を読み込みました`);
@@ -931,7 +1053,7 @@ $('#plan-file').addEventListener('change', async ev => {
   }
 });
 $('#plan-clear').addEventListener('click', () => { plan = null; localStorage.removeItem(K_PLAN); renderHome(); });
-$('#zone-select').addEventListener('change', fillLinesFromPlan);
+$('#zone-select').addEventListener('change', () => { fillLinesFromPlan(); pickWhole = false; renderZoneExtra(); renderPick(); });
 function fillLinesFromPlan(){
   if(!plan) return;
   const zid = $('#zone-select').value;
@@ -939,14 +1061,182 @@ function fillLinesFromPlan(){
   $('#lines-input').value = ls.length ? ls.join(', ') : 'L01';
 }
 
+/* ---------- 観察の種類（開始画面） ---------- */
+let curMode = localStorage.getItem('vobs:lastMode') || 'fixed';
+$('#mode-sel').addEventListener('click', ev => {
+  const b = ev.target.closest('button[data-mode]');
+  if(!b) return;
+  curMode = b.dataset.mode;
+  localStorage.setItem('vobs:lastMode', curMode); // 次の観察も同じ種類で始めやすいように覚えておく
+  renderHome();
+});
+function renderZoneExtra(){ $('#zone-extra-wrap').hidden = !(plan && $('#zone-select').value === '__new__'); }
+// 計画の数え上げの間隔を入力欄に入れる（計画を読み込んだときと、起動したときだけ）
+function applyPlanSettings(){
+  const st = (plan && plan.settings) || {};
+  $('#interval-lo').value = st.count_interval_lo ?? 4;
+  $('#interval-hi').value = st.count_interval_hi ?? 6;
+}
+
+/* ---------- 観察点を選ぶ・その場で置く（開始画面） ----------
+   計画の館内図があれば、地図の上の点をタップして選ぶか、空いている所をタップして新しく置く。
+   その場で置いた点は計画に足し（source: 'field'）、計画JSONとして書き出せる。
+   館内図がなければ、名前だけを入れる（座標は空欄） */
+let pickURL = null, pickWhole = false, pickedPoint = localStorage.getItem('vobs:lastPoint'), pendingPos = null;
+function planPoints(){ return (plan && Array.isArray(plan.obs_points)) ? plan.obs_points : []; }
+async function setupPick(){
+  pickURL = null;
+  if(curMode === 'fixed' && plan && plan.map && plan.map.width_px){
+    try{ pickURL = await idbGet('maps', plan.plan_id || 'unnamed-plan'); }catch(e){ pickURL = null; }
+  }
+  renderPick();
+}
+function renderPick(){
+  const fixed = curMode === 'fixed', canMap = fixed && !!plan && !!pickURL;
+  if(!planPoints().some(p => p.point_id === pickedPoint)) pickedPoint = null;
+  $('#pick-map').hidden = !canMap;
+  $('#point-manual-wrap').hidden = !fixed || canMap;
+  $('#point-new').hidden = !(canMap && pendingPos);
+  $('#pick-hint').textContent = canMap ? '地図の上の点をタップして選ぶか、空いている所をタップして新しく置きます。'
+    : plan && planPoints().length ? '一覧から選ぶか、下に名前を入れます（館内図がないので、座標は空欄になります）。'
+    : '観察点の名前を入れます（館内図がないので、座標は空欄になります）。';
+  $('#point-list').hidden = !fixed || !planPoints().length;
+  $('#point-list').innerHTML = planPoints().map(p => `<span class="pt">`
+    + `<button class="pt-btn${p.point_id === pickedPoint ? ' sel' : ''}" data-pt="${esc(p.point_id)}">${esc(p.name || p.point_id)}${p.source === 'field' ? '（現場）' : ''}</button>`
+    + (p.source === 'field' ? `<button class="pt-del" data-ptdel="${esc(p.point_id)}">消す</button>` : '') + `</span>`).join('');
+  if(!canMap) return;
+
+  const W = plan.map.width_px, H = plan.map.height_px, P = q => [q[0] * W, q[1] * H];
+  const z = plan.zones.find(z => z.zone_id === $('#zone-select').value);
+  let box = [0, 0, W, H];
+  if(!pickWhole && z){ // 選んだ区画の周りを、座る場所が入るように広めに映す
+    const q = z.polygon.map(P);
+    const x0 = Math.min(...q.map(a => a[0])), x1 = Math.max(...q.map(a => a[0]));
+    const y0 = Math.min(...q.map(a => a[1])), y1 = Math.max(...q.map(a => a[1]));
+    const m = Math.max(x1 - x0, y1 - y0) * 0.6 + Math.max(W, H) * 0.01;
+    box = [x0 - m, y0 - m, x1 - x0 + m * 2, y1 - y0 + m * 2];
+  }
+  $('#pick-whole').hidden = !z;
+  $('#pick-whole').textContent = pickWhole ? '区画の周り' : '全体';
+  const svgEl = $('#pick-svg'), r = svgEl.getBoundingClientRect();
+  const k = Math.min(r.width / box[2], r.height / box[3]) || 1;
+  const fs = 14 / k, halo = 4 / k;
+  const pts = a => a.map(q => P(q).join(',')).join(' ');
+  let s = `<image href="${pickURL}" x="0" y="0" width="${W}" height="${H}"/>`;
+  for(const zz of plan.zones) s += `<polygon class="mz${z && zz.zone_id === z.zone_id ? ' cur' : ''}" points="${pts(zz.polygon)}"/>`;
+  for(const p of planPoints()){
+    if(!p.pos) continue;
+    const [x, y] = P(p.pos);
+    s += `<circle class="mpt${p.point_id === pickedPoint ? ' sel' : ''}" cx="${x}" cy="${y}" r="${8 / k}"/>`;
+    s += `<text class="mlbl" x="${x}" y="${y + fs * 1.6}" font-size="${fs}" stroke-width="${halo}" text-anchor="middle">${esc(p.name || p.point_id)}</text>`;
+  }
+  if(pendingPos){ const [x, y] = P(pendingPos); s += `<circle class="mpt new" cx="${x}" cy="${y}" r="${10 / k}"/>`; }
+  svgEl.setAttribute('viewBox', box.join(' '));
+  svgEl.innerHTML = s;
+}
+$('#pick-whole').addEventListener('click', () => { pickWhole = !pickWhole; renderPick(); });
+window.addEventListener('resize', () => { if($('#home').classList.contains('on')) renderPick(); });
+$('#pick-svg').addEventListener('click', ev => {
+  if(!plan || !pickURL) return;
+  const svgEl = $('#pick-svg'), ctm = svgEl.getScreenCTM();
+  if(!ctm) return;
+  const W = plan.map.width_px, H = plan.map.height_px;
+  // 既にある観察点の近く（画面で24ピクセル以内）をタップしたら、その点を選ぶ
+  let best = null, bestD = 24;
+  for(const p of planPoints()){
+    if(!p.pos) continue;
+    const q = svgEl.createSVGPoint(); q.x = p.pos[0] * W; q.y = p.pos[1] * H;
+    const sp = q.matrixTransform(ctm);
+    const d = Math.hypot(sp.x - ev.clientX, sp.y - ev.clientY);
+    if(d < bestD){ bestD = d; best = p; }
+  }
+  if(best){ selectPoint(best.point_id); return; }
+  // 空いている所なら、新しい観察点の候補にする（名前を入れて「ここに置く」で確定）
+  const q = svgEl.createSVGPoint(); q.x = ev.clientX; q.y = ev.clientY;
+  const m = q.matrixTransform(ctm.inverse());
+  const x = m.x / W, y = m.y / H;
+  if(x < 0 || x > 1 || y < 0 || y > 1) return;
+  pendingPos = [Math.round(x * 1e5) / 1e5, Math.round(y * 1e5) / 1e5];
+  $('#point-new-name').value = `観察点${planPoints().length + 1}`;
+  renderPick();
+});
+function selectPoint(id){
+  pickedPoint = id; pendingPos = null;
+  if(id) localStorage.setItem('vobs:lastPoint', id);
+  renderPick();
+}
+$('#point-list').addEventListener('click', ev => {
+  const b = ev.target.closest('button');
+  if(!b) return;
+  if(b.dataset.pt) selectPoint(pickedPoint === b.dataset.pt ? null : b.dataset.pt);
+  if(b.dataset.ptdel){
+    const p = planPoints().find(p => p.point_id === b.dataset.ptdel);
+    if(!p || !confirm(`現場で置いた観察点「${p.name}」を計画から消しますか。\n（この点で記録した観察のデータは消えません）`)) return;
+    plan.obs_points = planPoints().filter(x => x !== p);
+    plan.field_unexported = true;
+    writeJSON(K_PLAN, plan);
+    renderPick(); renderPlanOut();
+  }
+});
+function nextPointId(){ const ids = planPoints().map(p => p.point_id); let n = 1; while(ids.includes('P' + String(n).padStart(2, '0'))) n++; return 'P' + String(n).padStart(2, '0'); }
+$('#point-new-ok').addEventListener('click', () => {
+  const name = $('#point-new-name').value.trim();
+  if(!name){ toast('観察点の名前を入れてください'); return; }
+  const id = nextPointId();
+  plan.obs_points = planPoints();
+  plan.obs_points.push({point_id:id, name, pos:pendingPos, source:'field', added_at:fmtLocal(Date.now())});
+  plan.field_unexported = true; // 現場で足した点を、まだ計画JSONとして書き出していない印
+  if(!writeJSON(K_PLAN, plan)) toast('計画を端末に保存できませんでした');
+  selectPoint(id); renderPlanOut();
+  toast(`観察点「${name}」を置きました`);
+});
+$('#point-new-cancel').addEventListener('click', () => { pendingPos = null; renderPick(); });
+// 観察を始めるときに使う観察点。地図で選んだ点 → 一覧で選んだ点 → 手で入れた名前、の順に探す
+function chosenPoint(){
+  const p = planPoints().find(p => p.point_id === pickedPoint);
+  if(p) return {point_id:p.point_id, name:p.name || p.point_id, x:p.pos ? p.pos[0] : null, y:p.pos ? p.pos[1] : null};
+  if(plan && pickURL) return null;
+  const name = $('#point-manual').value.trim();
+  return name ? {point_id:'', name, x:null, y:null} : null;
+}
+
+/* ---------- 現場で足した観察点を含めて、計画JSONを書き出す ---------- */
+function renderPlanOut(){
+  const n = planPoints().filter(p => p.source === 'field').length;
+  $('#plan-out').hidden = !plan || (!n && !plan.field_unexported);
+  $('#plan-out-note').innerHTML = plan && plan.field_unexported
+    ? `<span class="savebad">現場で変えた観察点（今 ${n}個）を含む計画を、まだ書き出していません。</span>`
+    : `現場で置いた観察点が ${n}個 あります（書き出し済み）。`;
+}
+$('#plan-export').addEventListener('click', async () => {
+  const full = JSON.parse(JSON.stringify(plan));
+  delete full.field_unexported;
+  let img = null;
+  try{ img = await idbGet('maps', plan.plan_id || 'unnamed-plan'); }catch(e){}
+  full.map = Object.assign({}, full.map || {}, {image: img || null}); // 端末に分けて保存していた館内図を戻す
+  const name = `plan_${(plan.plan_id || 'noname').replace(/[\\/:*?"<>|\s]+/g, '_')}.json`.replace(/^plan_plan_/, 'plan_');
+  const f = new File([JSON.stringify(full, null, 1)], name, {type:'application/json'});
+  const url = URL.createObjectURL(f), a = document.createElement('a');
+  a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+  plan.field_unexported = false;
+  writeJSON(K_PLAN, plan);
+  renderPlanOut();
+  toast(`${name} を書き出しました${img ? '' : '（館内図の画像は端末になかったので空欄）'}`);
+});
+
 /* ---------- 書き出し ---------- */
-const CSV_COLS = ['observation_id','plan_id','facility','zone_id','event_id','event_type','unit_id','t_epoch_ms','t_local','value_num','value_text','voided'];
+// 観察の種類と観察点は、観察の中で変わらない値だが、各行に持たせる（どの行からでも絞り込めるように）
+const CSV_COLS = ['observation_id','plan_id','facility','zone_id','obs_mode','point_id','point_name','point_x','point_y','event_id','event_type','unit_id','t_epoch_ms','t_local','value_num','value_text','voided'];
 function cell(v){ const s = String(v); return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }
 function buildCSV(){
   const out = [CSV_COLS.join(',')];
   for(const o of listObs()){
     for(const e of o.events){
-      out.push([o.observation_id, o.plan_id, o.facility, o.zone_id, e.event_id, e.event_type,
+      const pt = o.point || {}; // 以前の観察には種類と観察点がないので、空欄になる
+      out.push([o.observation_id, o.plan_id, o.facility, o.zone_id,
+                o.mode || '', pt.point_id || '', pt.name || '', pt.x ?? '', pt.y ?? '',
+                e.event_id, e.event_type,
                 e.unit_id ?? '', e.t, fmtLocal(e.t), e.value_num ?? '', e.value_text ?? '', e.voided ? 1 : 0]
                .map(cell).join(','));
     }
@@ -974,15 +1264,23 @@ function renderHome(){
   $('#plan-clear').hidden = !plan;
   $('#plan-fields').hidden = !plan;
   $('#manual-fields').hidden = !!plan;
+  $$('#mode-sel button').forEach(b => b.classList.toggle('sel', b.dataset.mode === curMode));
+  $('#mode-note').textContent = curMode === 'fixed'
+    ? '観察点に座ったまま、ほかの来館者の行動を記録します。観察の途中で観察点は変えられません。'
+    : '自分が来館者として区画に入り、出入りの時刻と感じ方を記録します。1つの区画ごとに1回の観察です。';
+  $('#fixed-fields').hidden = curMode !== 'fixed';
   if(plan){
     const prev = $('#zone-select').value;
-    $('#zone-select').innerHTML = plan.zones.map(z => `<option value="${esc(z.zone_id)}">${esc(z.name || z.zone_id)}</option>`).join('');
-    if(prev && plan.zones.some(z => z.zone_id === prev)) $('#zone-select').value = prev;
+    $('#zone-select').innerHTML = plan.zones.map(z => `<option value="${esc(z.zone_id)}">${esc(z.name || z.zone_id)}</option>`).join('')
+      + '<option value="__new__">（計画にない区画を入れる）</option>';
+    if(prev && (prev === '__new__' || plan.zones.some(z => z.zone_id === prev))) $('#zone-select').value = prev;
     fillLinesFromPlan();
-    if(plan.settings && plan.settings.count_interval_min) $('#interval-input').value = plan.settings.count_interval_min;
   }else if(!$('#facility-input').value){
     $('#facility-input').value = localStorage.getItem('vobs:lastFacility') || '';
   }
+  renderZoneExtra();
+  setupPick();
+  renderPlanOut();
 
   const all = listObs();
   const last = Number(localStorage.getItem(K_EXP) || 0);
@@ -993,7 +1291,7 @@ function renderHome(){
     : '<span class="muted">すべての記録を書き出し済みです。</span>';
   $('#obs-list').innerHTML = all.length
     ? all.slice().reverse().map(o =>
-        `<li style="display:flex;align-items:center;gap:10px"><div style="flex:1"><b>${esc(o.facility)}／${esc(o.zone_label || o.zone_id)}</b><br>`
+        `<li style="display:flex;align-items:center;gap:10px"><div style="flex:1"><b>${esc(o.facility)}／${esc(o.zone_label || o.zone_id)}</b>${o.mode ? `　<span class="muted">${o.mode === 'walk' ? '体験' : '定点'}${o.point ? '・' + esc(o.point.name) : ''}</span>` : ''}<br>`
         + `<span class="muted">${esc(o.observation_id)}　記録 ${o.events.filter(e => !e.voided).length}件${o.closed ? '' : '　途中'}</span></div>`
         + `<button class="ghost" style="color:var(--danger)" data-del="${esc(o.observation_id)}">削除</button></li>`).join('')
     : '<li class="muted">まだありません。</li>';
@@ -1003,7 +1301,7 @@ function renderHome(){
     $('#export-share').hidden = !(navigator.canShare && navigator.canShare({files:[test]}));
   }catch(e){ $('#export-share').hidden = true; }
 }
-function showHome(){ renderHome(); show('home'); }
+function showHome(){ show('home'); renderHome(); } // 先に表示してから描く（地図の大きさを測るため）
 
 // 練習の記録などを消す。端末から完全に消えるので、確認を2つ重ねる
 $('#obs-list').addEventListener('click', ev => {
@@ -1048,6 +1346,8 @@ if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch
 /* ---------- 起動：途中の観察があれば、そこから再開する ---------- */
 (function init(){
   plan = readJSON(K_PLAN);
+  if(plan && !Array.isArray(plan.obs_points)) plan.obs_points = [];
+  applyPlanSettings();
   const cur = localStorage.getItem(K_CUR);
   const o = cur ? readJSON(K_OBS + cur) : null;
   if(o && !o.closed){
