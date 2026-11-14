@@ -76,6 +76,8 @@ input,select{font:inherit;font-size:16px;color:var(--ink);background:var(--surfa
 .item-head .tag.z{color:var(--dwell)}
 .item-head .tag.l{color:var(--speed)}
 .item-head .tag.s{color:var(--stop)}
+.item-head .tag.p{color:var(--ink)}
+.src{font-size:12px;color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:0 6px}
 .item-head .sp{flex:1}
 .item-head button{font-size:14px;border:1px solid var(--line);border-radius:8px;padding:2px 10px;min-height:34px}
 .del{color:var(--danger)}
@@ -97,6 +99,9 @@ input,select{font:inherit;font-size:16px;color:var(--ink);background:var(--surfa
 .tmpl{fill:none;stroke:var(--danger);stroke-width:2;stroke-dasharray:6 4;vector-effect:non-scaling-stroke}
 .dot{fill:var(--surface);stroke:var(--danger);stroke-width:2;vector-effect:non-scaling-stroke}
 .end{fill:var(--surface);stroke:var(--speed);stroke-width:2;vector-effect:non-scaling-stroke}
+.pt{fill:var(--ink);stroke:var(--surface);stroke-width:3;vector-effect:non-scaling-stroke}
+.pt.sel{fill:var(--stop)}
+.hitp{fill:transparent}
 .lbl{fill:var(--ink);stroke:var(--surface);paint-order:stroke;font-weight:700;pointer-events:none}
 
 #toast{position:fixed;left:12px;right:12px;bottom:calc(env(safe-area-inset-bottom) + 16px);max-width:560px;margin:0 auto;z-index:30;
@@ -111,6 +116,7 @@ input,select{font:inherit;font-size:16px;color:var(--ink);background:var(--surfa
     <button class="mode" data-mode="rect">四角の区画</button>
     <button class="mode" data-mode="poly">多角形の区画</button>
     <button class="mode" data-mode="line">線の組</button>
+    <button class="mode" data-mode="point">観察点</button>
     <button class="mode" data-mode="scale">縮尺</button>
   </div>
   <div class="hint">
@@ -198,8 +204,8 @@ function newPlan(){
     plan_id:'plan_' + today(),
     facility:{name:'', kind:'museum'},
     map:{image:null, width_px:0, height_px:0, scale:null},
-    zones:[], speed_lines:[],
-    settings:{count_interval_min:5}
+    zones:[], speed_lines:[], obs_points:[],
+    settings:{count_interval_lo:4, count_interval_hi:6}
   };
 }
 function normalize(p){
@@ -209,7 +215,9 @@ function normalize(p){
   n.map = Object.assign(n.map, p.map || {});
   n.zones = Array.isArray(p.zones) ? p.zones : [];
   n.speed_lines = Array.isArray(p.speed_lines) ? p.speed_lines : [];
+  n.obs_points = Array.isArray(p.obs_points) ? p.obs_points : []; // 以前の計画には観察点がないので、空の一覧で補う
   n.settings = Object.assign(n.settings, p.settings || {});
+  delete n.settings.count_interval_min; // 以前の「固定の間隔」は使わなくなったので外す（最短・最長は既定の4〜6分）
   return n;
 }
 
@@ -317,6 +325,12 @@ function render(){
     s += seg(sc.a, sc.b, 'hit', d) + seg(sc.a, sc.b, 'sc' + (isSel('scale') ? ' sel' : ''), d);
     s += lbl(center([sc.a, sc.b]), sc.meters > 0 ? `${sc.meters} m` : '距離を入力');
   }
+  for(const p of P.obs_points){ // 観察点：黒い丸（選んでいると黄色）。指で押しやすいよう、見えない大きめの丸を重ねる
+    const [x, y] = px(p.pos), d = ` data-sel="point" data-id="${esc(p.point_id)}"`;
+    s += `<circle class="hitp" cx="${x}" cy="${y}" r="${16 * u}"${d}/>`;
+    s += `<circle class="pt${isSel('point', p.point_id) ? ' sel' : ''}" cx="${x}" cy="${y}" r="${7 * u}"${d}/>`;
+    s += `<text class="lbl" x="${x}" y="${y + fs * 1.6}" font-size="${fs}" stroke-width="${halo}" text-anchor="middle">${esc(p.name || p.point_id)}</text>`;
+  }
   // 描いている途中の図形
   if(temp.rect) s += `<polygon class="tmp" points="${pts(rectPoly(temp.rect[0], temp.rect[1]))}"/>`;
   if(temp.line1) s += seg(temp.line1[0], temp.line1[1], 'sl');
@@ -338,6 +352,7 @@ const HINTS = {
   rect: () => '四角の区画：対角の2点を、ドラッグでつなぎます。移動するときは2本指か「見る・選ぶ」で。',
   poly: () => `多角形の区画：角を順にタップします（今 ${temp.pts.length}点）。最初の点をもう一度タップするか「閉じて完成」で完成。`,
   line: () => !temp.line1 ? `線の組：1本目の線の両端を、順にタップします（${temp.pts.length}/2）。` : `線の組：2本目の線の両端を、順にタップします（${temp.pts.length}/2）。`,
+  point: () => '観察点：観察者が座る（立つ）位置をタップします。続けて名前を入れます。',
   scale: () => `縮尺：実際の距離がわかる2点を、順にタップします（${temp.pts.length}/2）。`
 };
 function renderHint(){
@@ -384,6 +399,15 @@ function finishPair(line1, line2){
   focusItem('pair', id, 'distance_m');
   toast(`線の組 ${id} を作りました。実際の距離（m）を入れてください`);
 }
+function addPoint(p){
+  const id = nextId('P', P.obs_points.map(q => q.point_id));
+  P.obs_points.push({point_id:id, name:'', pos:p});
+  sel = {kind:'point', id};
+  changed(true);
+  setMode('view');
+  focusItem('point', id, 'name');
+  toast(`観察点 ${id} を置きました。名前を入れてください`);
+}
 function finishScale(a, b){
   P.map.scale = {a, b, meters:null};
   sel = {kind:'scale', id:'scale'};
@@ -413,6 +437,8 @@ function handleTap(p, cx, cy){
       if(!temp.line1){ temp.line1 = temp.pts; temp.pts = []; }
       else{ finishPair(temp.line1, temp.pts); return; }
     }
+  }else if(mode === 'point'){
+    addPoint(p); return;
   }else if(mode === 'scale'){
     temp.pts.push(p);
     if(temp.pts.length === 2){ finishScale(temp.pts[0], temp.pts[1]); return; }
@@ -495,8 +521,12 @@ function renderPanel(){
     <label class="field">施設の名前<input data-f="facility_name" value="${esc(P.facility.name)}" autocomplete="off"></label>
     <div class="row2">
       <label class="field">施設の種類<select data-f="facility_kind">${KINDS.map(([k, v]) => `<option value="${k}"${P.facility.kind === k ? ' selected' : ''}>${v}</option>`).join('')}</select></label>
-      <label class="field">数える間隔（分）<input data-f="interval" type="number" inputmode="numeric" min="1" value="${esc(P.settings.count_interval_min)}"></label>
-    </div>`;
+    </div>
+    <div class="row2">
+      <label class="field">数える間隔の最短（分）<input data-f="interval_lo" type="number" inputmode="decimal" min="0.5" step="0.5" value="${esc(P.settings.count_interval_lo)}"></label>
+      <label class="field">最長（分）<input data-f="interval_hi" type="number" inputmode="decimal" min="0.5" step="0.5" value="${esc(P.settings.count_interval_hi)}"></label>
+    </div>
+    <p class="note">一斉の数え上げの知らせは、最短〜最長の間でランダムな間隔で出ます。</p>`;
 
   h += `<h2>館内図</h2><p class="note">${P.map.image ? `${P.map.width_px} × ${P.map.height_px} ピクセル、約${Math.round(P.map.image.length * 0.75 / 1024)}KB` : 'まだ読み込んでいません。'}</p>
     <label class="btn">${P.map.image ? '画像を差し替える' : '館内図の画像を選ぶ'}<input type="file" accept="image/*" data-img hidden></label>`;
@@ -542,6 +572,19 @@ function renderPanel(){
   });
   if(P.speed_lines.length) h += `<p class="note">距離は、メジャーなどで実際に測った値を優先してください。地図からの見積もりは、館内図の歪みの分だけずれます。</p>`;
 
+  h += `<h2>観察点（${P.obs_points.length}）</h2>`;
+  if(!P.obs_points.length) h += `<p class="note">上の「観察点」を選び、観察者が座る位置をタップします。現場の記録のアプリでも、その場で足せます。</p>`;
+  P.obs_points.forEach((p, i) => {
+    h += `<div class="item${isSel('point', p.point_id) ? ' sel' : ''}" data-item="point" data-id="${esc(p.point_id)}">
+      <div class="item-head"><span class="tag p">${esc(p.point_id)}</span>${p.source === 'field' ? '<span class="src">現場で追加</span>' : ''}<span class="sp"></span>
+        <button data-show="point" data-id="${esc(p.point_id)}">地図で見る</button>
+        <button class="del" data-del="point" data-id="${esc(p.point_id)}">削除</button></div>
+      <div class="row2">
+        <label class="field">ID<input data-pf="point_id" data-i="${i}" value="${esc(p.point_id)}" autocomplete="off"></label>
+        <label class="field">名前<input data-pf="name" data-i="${i}" data-focus="point:${esc(p.point_id)}:name" value="${esc(p.name)}" placeholder="例：入口横のベンチ" autocomplete="off"></label>
+      </div></div>`;
+  });
+
   h += `<h2>保存と書き出し</h2>
     <p class="note" id="save-state">${esc(saveText || '作業中の計画は、このブラウザに自動で保存されます。')}</p>
     <button class="btn primary" id="p-export">JSONを書き出す</button>
@@ -569,11 +612,13 @@ panel.addEventListener('input', e => {
   switch(t.dataset.f){
     case 'plan_id': P.plan_id = t.value.trim(); break;
     case 'facility_name': P.facility.name = t.value; break;
-    case 'interval': P.settings.count_interval_min = numOrNull(t.value) || 5; break;
+    case 'interval_lo': P.settings.count_interval_lo = numOrNull(t.value) ?? 4; break;
+    case 'interval_hi': P.settings.count_interval_hi = numOrNull(t.value) ?? 6; break;
     case 'scale_m': P.map.scale.meters = numOrNull(t.value); break;
   }
   if(t.dataset.zf === 'name') P.zones[i].name = t.value;
   if(t.dataset.lf === 'distance_m') P.speed_lines[i].distance_m = numOrNull(t.value);
+  if(t.dataset.pf === 'name') P.obs_points[i].name = t.value;
   changed(false);
 });
 panel.addEventListener('change', e => {
@@ -582,6 +627,7 @@ panel.addEventListener('change', e => {
   else if(t.dataset.f === 'scale_m') changed(true); // 縮尺が決まったら、見積もりを出し直す
   else if(t.dataset.zf === 'zone_id') renameZone(i, t.value.trim());
   else if(t.dataset.lf === 'line_pair_id') renamePair(i, t.value.trim());
+  else if(t.dataset.pf === 'point_id') renamePoint(i, t.value.trim());
   else if(t.dataset.lf === 'zone_id'){ P.speed_lines[i].zone_id = t.value; changed(false); }
   else if('img' in t.dataset){ const f = t.files[0]; t.value = ''; if(f) loadImage(f); }
   else if('json' in t.dataset){ const f = t.files[0]; t.value = ''; if(f) importJSON(f); }
@@ -619,6 +665,14 @@ function renamePair(i, nv){
   if(isSel('pair', old)) sel.id = nv;
   changed(true);
 }
+function renamePoint(i, nv){
+  const old = P.obs_points[i].point_id;
+  if(!nv || nv === old){ renderPanel(); return; }
+  if(P.obs_points.some(p => p.point_id === nv)){ toast(`${nv} はすでに使われています`); renderPanel(); return; }
+  P.obs_points[i].point_id = nv;
+  if(isSel('point', old)) sel.id = nv;
+  changed(true);
+}
 function delItem(kind, id){
   if(kind === 'scale'){ if(!confirm('縮尺を削除しますか。')) return; P.map.scale = null; }
   if(kind === 'zone'){
@@ -627,6 +681,7 @@ function delItem(kind, id){
     P.speed_lines.forEach(l => { if(l.zone_id === id) l.zone_id = ''; });
   }
   if(kind === 'pair'){ if(!confirm(`線の組 ${id} を削除しますか。`)) return; P.speed_lines = P.speed_lines.filter(l => l.line_pair_id !== id); }
+  if(kind === 'point'){ if(!confirm(`観察点 ${id} を削除しますか。`)) return; P.obs_points = P.obs_points.filter(p => p.point_id !== id); }
   if(isSel(kind, id)) sel = null;
   changed(true);
 }
@@ -634,6 +689,10 @@ function showItem(kind, id){
   sel = {kind, id};
   if(kind === 'zone'){ const z = P.zones.find(z => z.zone_id === id); if(z) fitPoints(z.polygon); }
   if(kind === 'pair'){ const l = P.speed_lines.find(l => l.line_pair_id === id); if(l) fitPoints([...l.line1, ...l.line2]); }
+  if(kind === 'point'){ // 点には大きさがないので、館内図の長い辺の5%ぶんの範囲を映す
+    const p = P.obs_points.find(p => p.point_id === id);
+    if(p){ const [x, y] = px(p.pos), m = Math.max(W(), H()) * 0.05; fitBox(x - m, y - m, x + m, y + m, 0); }
+  }
   renderPanel();
 }
 
@@ -692,6 +751,8 @@ function problems(){
     if(!(l.distance_m > 0)) out.push(`${l.line_pair_id} の実際の距離が入っていません`);
   });
   if(P.map.scale && !(P.map.scale.meters > 0)) out.push('縮尺の距離が入っていません');
+  P.obs_points.forEach(p => { if(!(p.name || '').trim()) out.push(`観察点 ${p.point_id} の名前が空です`); });
+  if(!(P.settings.count_interval_hi >= P.settings.count_interval_lo)) out.push('数える間隔の最長が最短より短くなっています');
   return out;
 }
 async function exportPlan(share){
